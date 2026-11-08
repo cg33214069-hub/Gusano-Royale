@@ -280,7 +280,9 @@
 
           alert("¡Bienvenido de vuelta!");
           
-          localStorage.setItem('player_name', username || email.split('@')[0]);
+          // CORREGIDO: Se valida de forma segura sin romper si la variable no existe en el login
+          const userNick = email.split('@')[0];
+          localStorage.setItem('player_name', userNick);
           localStorage.setItem('selected_entry', '100');
 
           window.location.href = 'dashboard.html';
