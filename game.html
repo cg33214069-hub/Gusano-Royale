@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gusanos Royale - Arena</title>
+  
+  <!-- 1. CARGAMOS LA LIBRERÍA OFICIAL DE SUPABASE PRIMERO -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    body, html { width: 100%; height: 100%; overflow: hidden; background-color: #0b0f19; font-family: 'Segoe UI', sans-serif; color: #fff; touch-action: none; }
+    #game-container { position: relative; width: 100vw; height: 100vh; }
+    canvas { display: block; background: radial-gradient(circle, #121829 0%, #080b12 100%); }
+
+    .hud-bar {
+      position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 20px; background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1); padding: 10px 24px;
+      border-radius: 50px; backdrop-filter: blur(8px); z-index: 10;
+    }
+    .hud-item { display: flex; flex-direction: column; align-items: center; }
+    .hud-label { font-size: 0.7rem; text-transform: uppercase; color: #94a3b8; }
+    .hud-value { font-size: 1.2rem; font-weight: 800; color: #38bdf8; }
+    .hud-value.ves { color: #4ade80; }
+    .hud-value.timer { color: #fbbf24; }
+    .hud-value.alive { color: #f43f5e; }
+
+    #phase-banner {
+      position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+      background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #38bdf8;
+      padding: 6px 20px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; z-index: 10;
+      text-align: center; max-width: 90%;
+    }
+
+    #leave-btn {
+      position: absolute; top: 15px; left: 15px; background: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; z-index: 10;
+    }
+
+    .leaderboard {
+      position: absolute; top: 15px; right: 15px; width: 180px;
+      background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 12px; border-radius: 12px; z-index: 10; display: none;
+    }
+    @media (min-width: 768px) { .leaderboard { display: block; } }
+    .leaderboard h3 { font-size: 0.85rem; text-transform: uppercase; color: #cbd5e1; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; }
+    .lb-row { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px; }
+    .lb-row.player { color: #4ade80; font-weight: bold; }
+
+    #minimap {
+      position: absolute; top: 140px; right: 15px; width: 100px; height: 100px;
+      background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 50%; overflow: hidden; z-index: 10;
+    }
+
+    /* CONTROLES TÁCTILES VIRTUALES (D-PAD) */
+    #mobile-controls {
+      position: fixed;
+      bottom: 25px;
+      left: 25px;
+      z-index: 9999;
+      touch-action: manipulation;
+    }
+    .dpad-container {
+      display: grid;
+      grid-template-columns: repeat(3, 55px);
+      grid-template-rows: repeat(3, 55px);
+      gap: 5px;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 8px;
+      border-radius: 50%;
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .dpad-btn {
+      background: rgba(56, 189, 248, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      color: white;
+      font-size: 20px;
+      border-radius: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      touch-action: manipulation;
+    }
+    .dpad-btn:active, .dpad-btn.pressed {
+      background: rgba(34, 197, 94, 0.8);
+    }
+    #btn-up { grid-column: 2; grid-row: 1; }
+    #btn-left { grid-column: 1; grid-row: 2; }
+    #btn-right { grid-column: 3; grid-row: 2; }
+    #btn-down { grid-column: 2; grid-row: 3; }
+
+    #boost-btn {
+      position: absolute; bottom: 35px; right: 25px; width: 75px; height: 75px; border-radius: 50%;
+      background: radial-gradient(circle, #38bdf8 0%, #0284c7 100%); border: 2px solid #7dd3fc;
+      color: white; font-weight: bold; font-size: 0.85rem; display: flex; justify-content: center;
+      align-items: center; cursor: pointer; z-index: 10; touch-action: manipulation;
+      box-shadow: 0 4px 15px rgba(56, 189, 248, 0.4);
+    }
+    #boost-btn:active { transform: scale(0.95); }
+
+    .modal-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(8, 11, 18, 0.92); display: flex; justify-content: center; align-items: center; z-index: 100;
+    }
+    .modal {
+      background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.1); padding: 25px;
+      border-radius: 20px; max-width: 420px; width: 90%; text-align: center;
+    }
+    .modal h2 { font-size: 1.8rem; margin-bottom: 10px; color: #38bdf8; }
+    .btn-primary { background: #22c55e; color: #fff; border: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; }
+  </style>
+</head>
+<body>
+
+<div id="game-container">
+  <!-- Botón de abandonar seguro -->
+  <button id="leave-btn" onclick="abandonarPartida()">Abandonar</button>
+
+  <div class="hud-bar">
+    <div class="hud-item"><span class="hud-label" id="timer-label">Preparación</span><span class="hud-value timer" id="timer-display">00:10</span></div>
+    <div class="hud-item"><span class="hud-label">Mi Botín</span><span class="hud-value ves" id="ves-display">0 VES</span></div>
+    <div class="hud-item"><span class="hud-label">Vivos</span><span class="hud-value alive" id="alive-display">100 / 100</span></div>
+  </div>
+
+  <div id="phase-banner">FASE DE PREPARACIÓN: Ubícate en el mapa</div>
+
+  <div class="leaderboard">
+    <h3>Top Ganadores</h3>
+    <div id="lb-content"></div>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+  <canvas id="minimap"></canvas>
+
+  <!-- CONTROLES TÁCTILES FLOTANTES EN PANTALLA -->
+  <div id="mobile-controls">
+    <div class="dpad-container">
+      <button class="dpad-btn" id="btn-up">⬆️</button>
+      <button class="dpad-btn" id="btn-left">⬅️</button>
+      <button class="dpad-btn" id="btn-right">➡️</button>
+      <button class="dpad-btn" id="btn-down">⬇️</button>
+    </div>
+  </div>
+
+  <div id="boost-btn">TURBO</div>
+
+  <!-- Modal de Fin de Partida -->
+  <div class="modal-overlay" id="end-modal" style="display: none;">
+    <div class="modal">
+      <h2 id="end-title">FIN DE LA PARTIDA</h2>
+      <p id="end-desc"></p>
+      <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin: 20px 0;">
+        <div style="font-size: 0.8rem; color: #94a3b8;">BOTÍN FINAL RETIRADO</div>
+        <div style="font-size: 2rem; font-weight: 800; color: #4ade80;" id="end-ves-amount">0 VES</div>
+      </div>
+      <button class="btn-primary" onclick="window.location.href='dashboard.html'">VOLVER AL PANEL</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Bandera de optimización para congelar cálculos pesados durante los 10 segundos iniciales
+  window.isPreparingTimerActive = true;
+  setTimeout(() => { window.isPreparingTimerActive = false; }, 10000);
+
+  // FUNCIÓN PARA ABANDONAR PARTIDA DE FORMA SEGURA
+  function abandonarPartida() {
+    if (confirm("¿Estás seguro de abandonar la partida? Perderás el dinero de la entrada.")) {
+      localStorage.removeItem('selected_entry');
+      window.location.href = 'dashboard.html';
+    }
+  }
+
+  // CONECTAR BOTONES TÁCTILES VIRTUALES CON EL JUEGO
+  function simulateKey(keyName, eventType) {
+    const event = new KeyboardEvent(eventType, { key: keyName, bubbles: true });
+    window.dispatchEvent(event);
+  }
+
+  const dpadBindings = {
+    'btn-up': 'ArrowUp',
+    'btn-down': 'ArrowDown',
+    'btn-left': 'ArrowLeft',
+    'btn-right': 'ArrowRight'
+  };
+
+  Object.keys(dpadBindings).forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        btn.classList.add('pressed');
+        simulateKey(dpadBindings[btnId], 'keydown');
+      });
+      btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        btn.classList.remove('pressed');
+        simulateKey(dpadBindings[btnId], 'keyup');
+      });
+      // Soporte para pruebas desde PC con mouse
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        simulateKey(dpadBindings[btnId], 'keydown');
+      });
+      btn.addEventListener('mouseup', (e) => {
+        e.preventDefault();
+        simulateKey(dpadBindings[btnId], 'keyup');
+      });
+    }
+  });
+
+  // FUNCIÓN DE RESPALDO PARA SUMAR GANANCIAS EN SUPABASE
+  async function finishGameAndReward(amountWon) {
+    if (typeof supabase === 'undefined') {
+      console.error("supabase no está definido en el script principal.");
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    let profile = null;
+
+    if (user) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, balance')
+        .eq('id', user.id)
+        .maybeSingle();
+      profile = data;
+    }
+
+    if (!profile) {
+      const { data: allProfiles } = await supabase
+        .from('profiles')
+        .select('id, balance')
+        .limit(1);
+      if (allProfiles && allProfiles.length > 0) {
+        profile = allProfiles[0];
+      }
+    }
+
+    if (!profile) {
+      alert("Error al encontrar perfil para acreditar premio.");
+      return;
+    }
+
+    const currentBalance = Number(profile.balance || 0);
+    const newBalance = currentBalance + Number(amountWon);
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ balance: newBalance })
+      .eq('id', profile.id);
+
+    if (error) {
+      alert("Error al guardar ganancias en Supabase: " + error.message);
+    } else {
+      document.getElementById('end-ves-amount').innerText = `${amountWon.toLocaleString('es-VE')} VES`;
+      document.getElementById('end-modal').style.display = 'flex';
+    }
+  }
+</script>
+
+<!-- 2. ENLAZAMOS LA LÓGICA DEL JUEGO AL FINAL -->
+<script src="script.js"></script>
+</body>
+</html>

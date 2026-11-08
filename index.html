@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gusanos Royale - Acceso</title>
+  
+  <!-- Enlace al Manifiesto PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#000000">
+
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Librería oficial de Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      background-color: #090d16;
+      color: #ffffff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 15px;
+    }
+    .auth-card {
+      background: #0f172a;
+      padding: 30px 25px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      margin: auto;
+    }
+    .auth-card h1 { color: #38bdf8; margin-bottom: 5px; font-size: 1.6rem; }
+    .auth-card p { color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px; }
+    .input-group {
+      margin-bottom: 12px;
+      text-align: left;
+    }
+    .input-group label { display: block; font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px; }
+    .input-group input {
+      width: 100%;
+      padding: 12px;
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: white;
+      font-size: 0.95rem;
+    }
+    .btn-auth {
+      width: 100%;
+      padding: 12px;
+      background: #22c55e;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      margin-top: 10px;
+    }
+    .btn-auth:active { transform: scale(0.98); }
+    .btn-auth:hover { background: #16a34a; }
+    .switch-auth {
+      margin-top: 15px;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+    .switch-auth span { color: #38bdf8; cursor: pointer; font-weight: bold; }
+    .switch-auth span:hover { text-decoration: underline; }
+    .register-fields { display: none; }
+
+    /* CONTROLES TÁCTILES FLOTANTES PARA MÓVIL */
+    #mobile-controls {
+      display: none;
+      position: fixed;
+      bottom: 25px;
+      right: 25px;
+      z-index: 9999;
+      touch-action: manipulation;
+    }
+    .dpad-container {
+      display: grid;
+      grid-template-columns: repeat(3, 55px);
+      grid-template-rows: repeat(3, 55px);
+      gap: 5px;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 8px;
+      border-radius: 50%;
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .dpad-btn {
+      background: rgba(56, 189, 248, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      font-size: 22px;
+      border-radius: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      touch-action: manipulation;
+    }
+    .dpad-btn:active {
+      background: rgba(34, 197, 94, 0.7);
+    }
+    #btn-up { grid-column: 2; grid-row: 1; }
+    #btn-left { grid-column: 1; grid-row: 2; }
+    #btn-right { grid-column: 3; grid-row: 2; }
+    #btn-down { grid-column: 2; grid-row: 3; }
+  </style>
+</head>
+<body>
+
+  <div class="auth-card">
+    <h1 id="auth-title">🐛 Gusanos Royale</h1>
+    <p id="auth-subtitle">Inicia sesión para entrar a las arenas</p>
+
+    <div id="auth-form">
+      <!-- CAMPOS EXCLUSIVOS DE REGISTRO -->
+      <div id="register-extra-fields" class="register-fields">
+        <div class="input-group">
+          <label for="fullname-input">Nombre Completo</label>
+          <input type="text" id="fullname-input" placeholder="Ej. César Gómez">
+        </div>
+
+        <div class="input-group">
+          <label for="username-input">Nombre de Usuario / Apodo</label>
+          <input type="text" id="username-input" placeholder="Ej. ElFlaco">
+        </div>
+
+        <div class="input-group">
+          <label for="phone-input">Número de Teléfono / Celular</label>
+          <input type="text" id="phone-input" placeholder="Ej. 0412-1234567">
+        </div>
+      </div>
+
+      <!-- CAMPOS COMUNES -->
+      <div class="input-group">
+        <label for="email-input">Correo Electrónico</label>
+        <input type="email" id="email-input" placeholder="tu_correo@gmail.com">
+      </div>
+
+      <div class="input-group">
+        <label for="password-input">Contraseña</label>
+        <input type="password" id="password-input" placeholder="••••••••">
+      </div>
+
+      <!-- CONFIRMAR CONTRASEÑA -->
+      <div class="input-group register-fields" id="confirm-password-container">
+        <label for="confirm-password-input">Confirmar Contraseña</label>
+        <input type="password" id="confirm-password-input" placeholder="••••••••">
+      </div>
+
+      <button class="btn-auth" id="auth-btn" onclick="handleAuth()">Iniciar Sesión</button>
+
+      <div class="switch-auth">
+        <span id="switch-text" onclick="toggleMode()">¿No tienes cuenta? Regístrate aquí</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL DE CONTROLES TÁCTILES PARA CELULAR -->
+  <div id="mobile-controls">
+    <div class="dpad-container">
+      <button class="dpad-btn" id="btn-up">⬆️</button>
+      <button class="dpad-btn" id="btn-left">⬅️</button>
+      <button class="dpad-btn" id="btn-right">➡️</button>
+      <button class="dpad-btn" id="btn-down">⬇️</button>
+    </div>
+  </div>
+
+  <script>
+    // Inicialización segura de Supabase global
+    const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
+    
+    let supabaseClient = null;
+    try {
+      if (window.supabase) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      }
+    } catch (e) {
+      console.error("Error al inicializar Supabase:", e);
+    }
+
+    let isRegistering = false;
+
+    function toggleMode() {
+      isRegistering = !isRegistering;
+      
+      document.getElementById('auth-title').innerText = isRegistering ? "📝 Crear Cuenta" : "🐛 Gusanos Royale";
+      document.getElementById('auth-subtitle').innerText = isRegistering ? "Completa tus datos para registrarte" : "Inicia sesión para entrar a las arenas";
+      document.getElementById('auth-btn').innerText = isRegistering ? "Registrarse" : "Iniciar Sesión";
+      document.getElementById('switch-text').innerText = isRegistering ? "¿Ya tienes cuenta? Inicia sesión" : "¿No tienes cuenta? Regístrate aquí";
+
+      const extraFields = document.querySelectorAll('.register-fields');
+      extraFields.forEach(el => {
+        el.style.display = isRegistering ? "block" : "none";
+      });
+    }
+
+    async function handleAuth() {
+      if (!supabaseClient) {
+        alert("Error crítico: Supabase no se pudo conectar. Revisa tu conexión a internet.");
+        return;
+      }
+
+      const email = document.getElementById('email-input').value.trim();
+      const password = document.getElementById('password-input').value.trim();
+      const authBtn = document.getElementById('auth-btn');
+
+      if (!email || !password) {
+        alert("Por favor completa el correo y la contraseña.");
+        return;
+      }
+
+      authBtn.disabled = true;
+      authBtn.innerText = "Cargando...";
+
+      try {
+        if (isRegistering) {
+          const fullname = document.getElementById('fullname-input').value.trim();
+          const username = document.getElementById('username-input').value.trim();
+          const phone = document.getElementById('phone-input').value.trim();
+          const confirmPassword = document.getElementById('confirm-password-input').value.trim();
+
+          if (!fullname || !username || !phone) {
+            alert("Por favor completa todos tus datos personales.");
+            authBtn.disabled = false;
+            authBtn.innerText = "Registrarse";
+            return;
+          }
+          if (password !== confirmPassword) {
+            alert("❌ Las contraseñas no coinciden. Por favor verifícalas.");
+            authBtn.disabled = false;
+            authBtn.innerText = "Registrarse";
+            return;
+          }
+          if (password.length < 6) {
+            alert("⚠️ La contraseña debe tener al menos 6 caracteres.");
+            authBtn.disabled = false;
+            authBtn.innerText = "Registrarse";
+            return;
+          }
+
+          const { data, error } = await supabaseClient.auth.signUp({ email, password });
+          if (error) throw error;
+
+          if (data.user) {
+            await supabaseClient.from('profiles').insert([
+              { 
+                id: data.user.id, 
+                full_name: fullname,
+                username: username, 
+                phone: phone,
+                balance: 0 
+              }
+            ]);
+          }
+
+          alert("¡Registro exitoso! Ya puedes iniciar sesión con tus datos.");
+          toggleMode();
+
+        } else {
+          const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+
+          alert("¡Bienvenido de vuelta!");
+          
+          localStorage.setItem('player_name', username || email.split('@')[0]);
+          localStorage.setItem('selected_entry', '100');
+
+          window.location.href = 'dashboard.html';
+        }
+      } catch (err) {
+        alert("Error: " + err.message);
+      } finally {
+        authBtn.disabled = false;
+        authBtn.innerText = isRegistering ? "Registrarse" : "Iniciar Sesión";
+      }
+    }
+
+    // EMITIR EVENTOS DE BOTONES TÁCTILES A Nivel GLOBAL
+    function sendDirection(dirKey) {
+      const event = new KeyboardEvent('keydown', { key: dirKey, bubbles: true });
+      window.dispatchEvent(event);
+    }
+
+    // Asignación de eventos de toque rápido para teléfono
+    const controls = {
+      'btn-up': 'ArrowUp',
+      'btn-down': 'ArrowDown',
+      'btn-left': 'ArrowLeft',
+      'btn-right': 'ArrowRight'
+    };
+
+    Object.keys(controls).forEach(btnId => {
+      const btn = document.getElementById(btnId);
+      if (btn) {
+        btn.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          sendDirection(controls[btnId]);
+        });
+        btn.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          sendDirection(controls[btnId]);
+        });
+      }
+    });
+
+    // Detectar si el usuario está en teléfono para mostrar controles cuando inicie el juego
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+      window.isMobileDevice = true;
+    }
+  </script>
+</body>
+</html>

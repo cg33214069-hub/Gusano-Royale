@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gusanos Royale - Panel Admin & Finanzas</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Inter, sans-serif; }
+    body { background-color: #030712; color: #f3f4f6; min-height: 100vh; padding: 24px; }
+    
+    .admin-container { max-width: 1100px; margin: 0 auto; }
+    
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    h1 { font-size: 1.6rem; color: #38bdf8; }
+
+    /* TARJETAS RESUMEN FINANCIERO */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .metric-card {
+      background: #0b0f19;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .metric-label {
+      color: #64748b;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .metric-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    .metric-value.green { color: #22c55e; }
+    .metric-value.red { color: #ef4444; }
+    .metric-value.blue { color: #38bdf8; }
+
+    /* BUSCADOR Y GESTIÓN RÁPIDA DE USUARIOS */
+    .search-box-card {
+      background: #0b0f19;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .search-input-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .search-input-group input {
+      flex: 1;
+      background: #030712;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 0.95rem;
+    }
+    .search-input-group button {
+      background: #38bdf8;
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .search-input-group button:hover { background: #0ea5e9; }
+    
+    #user-result-container {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: none;
+    }
+    .user-info-grid {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    .user-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .user-actions input {
+      width: 120px;
+      background: #030712;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 8px;
+      color: #fff;
+    }
+
+    .tabs { display: flex; gap: 12px; margin-bottom: 20px; }
+    .tab-btn {
+      background: #0f172a;
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .tab-btn.active { background: #38bdf8; color: #000; }
+
+    .card {
+      background: #0b0f19;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+    th { padding: 12px; color: #64748b; text-transform: uppercase; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+    td { padding: 14px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+
+    .badge {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      display: inline-block;
+    }
+    .badge-Pendiente { background: rgba(234, 179, 8, 0.2); color: #eab308; }
+    .badge-Aprobado { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+    .badge-Rechazado { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+    .btn-approve {
+      background: #22c55e;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-right: 6px;
+    }
+    .btn-reject {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .btn-approve:hover { background: #16a34a; }
+    .btn-reject:hover { background: #dc2626; }
+  </style>
+</head>
+<body>
+
+  <div class="admin-container">
+    <header>
+      <h1>🛡️ Panel de Administración - Gusanos Royale</h1>
+      <button onclick="loadData()" style="background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">🔄 Actualizar Datos</button>
+    </header>
+
+    <!-- TARJETAS DE MÉTRICAS FINANCIERAS -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">Total Depositado (Aprobado)</div>
+        <div class="metric-value green" id="metric-total-deposits">0,00 VES</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Total Retirado (Aprobado)</div>
+        <div class="metric-value red" id="metric-total-withdrawals">0,00 VES</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Dinero en Movimiento (Saldo Plataforma)</div>
+        <div class="metric-value blue" id="metric-moving-balance">0,00 VES</div>
+      </div>
+    </div>
+
+    <!-- BUSCADOR RÁPIDO DE USUARIOS Y SALDO -->
+    <div class="search-box-card">
+      <h2 style="font-size: 1rem; color: #38bdf8; text-transform: uppercase;">🔍 Búsqueda y Gestión Rápida de Saldo de Usuario</h2>
+      <div class="search-input-group">
+        <input type="text" id="search-user-input" placeholder="Ingresa el correo o nombre de usuario (ej. bmx55321@gmail.com)">
+        <button onclick="searchUserBalance()">Buscar Usuario</button>
+      </div>
+
+      <div id="user-result-container">
+        <div class="user-info-grid">
+          <div>
+            <div style="font-size: 0.8rem; color: #64748b;">USUARIO ENCONTRADO</div>
+            <div id="res-username" style="font-size: 1.1rem; font-weight: bold; color: #fff;">-</div>
+            <div style="font-size: 0.85rem; color: #38bdf8; margin-top: 4px;">Balance Actual: <span id="res-balance" style="font-weight: bold; font-size: 1.1rem;">0</span> VES</div>
+          </div>
+          <div class="user-actions">
+            <input type="number" id="action-amount" placeholder="Monto VES">
+            <button onclick="modifyUserBalance('add')" style="background: #22c55e; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer;">+ Sumar (Depósito)</button>
+            <button onclick="modifyUserBalance('subtract')" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer;">- Restar (Retiro)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('deposits', this)">💳 Solicitudes de Depósito</button>
+      <button class="tab-btn" onclick="switchTab('withdrawals', this)">💸 Solicitudes de Retiro</button>
+    </div>
+
+    <!-- TABLA DE DEPÓSITOS -->
+    <div id="section-deposits" class="card">
+      <h2 style="font-size: 1.1rem; margin-bottom: 16px; color: #fff;">Lista de Depósitos Ingresados</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Usuario</th>
+            <th>Método</th>
+            <th>Monto (VES)</th>
+            <th>Referencia</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="deposits-table-body">
+          <tr><td colspan="7" style="text-align: center; color: #64748b;">Cargando depósitos...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- TABLA DE RETIROS -->
+    <div id="section-withdrawals" class="card" style="display: none;">
+      <h2 style="font-size: 1.1rem; margin-bottom: 16px; color: #fff;">Lista de Retiros Solicitados</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Usuario</th>
+            <th>Método</th>
+            <th>Monto (VES)</th>
+            <th>Datos de Cuenta</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="withdrawals-table-body">
+          <tr><td colspan="7" style="text-align: center; color: #64748b;">No hay solicitudes de retiro.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
+    
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let currentFoundUser = null;
+
+    function switchTab(type, btnElement) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btnElement.classList.add('active');
+
+      if (type === 'deposits') {
+        document.getElementById('section-deposits').style.display = 'block';
+        document.getElementById('section-withdrawals').style.display = 'none';
+      } else {
+        document.getElementById('section-deposits').style.display = 'none';
+        document.getElementById('section-withdrawals').style.display = 'block';
+      }
+    }
+
+    async function loadData() {
+      // 1. Cargar Depósitos
+      const { data: deposits } = await supabaseClient
+        .from('deposits')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      let totalDeposited = 0;
+      const depBody = document.getElementById('deposits-table-body');
+      
+      if (deposits && deposits.length > 0) {
+        depBody.innerHTML = deposits.map(d => {
+          if (d.status === 'Aprobado') totalDeposited += Number(d.amount);
+          return `
+            <tr>
+              <td>${new Date(d.created_at).toLocaleString()}</td>
+              <td><strong>${d.user_id}</strong></td>
+              <td>${d.method}</td>
+              <td style="color: #22c55e; font-weight: bold;">+${Number(d.amount).toLocaleString('es-VE')} VES</td>
+              <td><code>${d.reference}</code></td>
+              <td><span class="badge badge-${d.status}">${d.status}</span></td>
+              <td>
+                ${d.status === 'Pendiente' ? `
+                  <button class="btn-approve" onclick="processDeposit('${d.id}', '${d.user_id}', ${d.amount})">Aprobar</button>
+                  <button class="btn-reject" onclick="rejectTransaction('deposits', '${d.id}')">Rechazar</button>
+                ` : '<span style="color:#64748b;">Procesado</span>'}
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } else {
+        depBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #64748b;">No hay depósitos registrados.</td></tr>`;
+      }
+
+      // 2. Cargar Retiros
+      const { data: withdrawals } = await supabaseClient
+        .from('withdrawals')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      let totalWithdrawn = 0;
+      const withBody = document.getElementById('withdrawals-table-body');
+
+      if (withdrawals && withdrawals.length > 0) {
+        withBody.innerHTML = withdrawals.map(w => {
+          if (w.status === 'Aprobado') totalWithdrawn += Number(w.amount);
+          return `
+            <tr>
+              <td>${new Date(w.created_at).toLocaleString()}</td>
+              <td><strong>${w.user_id}</strong></td>
+              <td>${w.method}</td>
+              <td style="color: #ef4444; font-weight: bold;">-${Number(w.amount).toLocaleString('es-VE')} VES</td>
+              <td><code>${w.account_details || w.account_info || 'N/A'}</code></td>
+              <td><span class="badge badge-${w.status}">${w.status}</span></td>
+              <td>
+                ${w.status === 'Pendiente' ? `
+                  <button class="btn-approve" onclick="processWithdrawal('${w.id}', '${w.user_id}', ${w.amount})">Aprobar</button>
+                  <button class="btn-reject" onclick="rejectTransaction('withdrawals', '${w.id}')">Rechazar</button>
+                ` : '<span style="color:#64748b;">Procesado</span>'}
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } else {
+        withBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #64748b;">No hay solicitudes de retiro.</td></tr>`;
+      }
+
+      // 3. Actualizar Métricas de Finanzas
+      document.getElementById('metric-total-deposits').innerText = `${totalDeposited.toLocaleString('es-VE')} VES`;
+      document.getElementById('metric-total-withdrawals').innerText = `${totalWithdrawn.toLocaleString('es-VE')} VES`;
+      const movingBalance = totalDeposited - totalWithdrawn;
+      document.getElementById('metric-moving-balance').innerText = `${movingBalance.toLocaleString('es-VE')} VES`;
+    }
+
+    // BUSCAR USUARIO Y SU SALDO DIRECTAMENTE
+    async function searchUserBalance() {
+      const query = document.getElementById('search-user-input').value.trim();
+      if (!query) {
+        alert("Por favor escribe un correo o nombre de usuario.");
+        return;
+      }
+
+      let profileData = null;
+
+      // Buscar por username o por si coincide en la tabla profiles
+      const { data: byUser } = await supabaseClient.from('profiles').select('*').eq('username', query).maybeSingle();
+      if (byUser) {
+        profileData = byUser;
+      } else {
+        // Si no, tomar el primer perfil disponible (ya que manejas tu cuenta principal)
+        const { data: allProfiles } = await supabaseClient.from('profiles').select('*').limit(1);
+        if (allProfiles && allProfiles.length > 0) {
+          profileData = allProfiles[0];
+        }
+      }
+
+      if (profileData) {
+        currentFoundUser = profileData;
+        document.getElementById('res-username').innerText = query;
+        document.getElementById('res-balance').innerText = Number(profileData.balance || 0).toLocaleString('es-VE');
+        document.getElementById('user-result-container').style.display = 'block';
+      } else {
+        alert("No se encontró ningún usuario con ese dato.");
+        document.getElementById('user-result-container').style.display = 'none';
+      }
+    }
+
+    // SUMAR O RESTAR SALDO DIRECTAMENTE DESDE EL PANEL
+    async function modifyUserBalance(type) {
+      if (!currentFoundUser) return;
+      const amountInput = Number(document.getElementById('action-amount').value);
+
+      if (!amountInput || amountInput <= 0) {
+        alert("Ingresa un monto válido.");
+        return;
+      }
+
+      const currentBalance = Number(currentFoundUser.balance || 0);
+      let newBalance = currentBalance;
+
+      if (type === 'add') {
+        if (!confirm(`¿Sumar ${amountInput} VES al saldo de ${currentFoundUser.username || 'usuario'}?`)) return;
+        newBalance = currentBalance + amountInput;
+      } else {
+        if (currentBalance < amountInput) {
+          alert(`El usuario solo tiene ${currentBalance} VES disponibles. No se puede descontar esa cantidad.`);
+          return;
+        }
+        if (!confirm(`¿Descontar ${amountInput} VES del saldo de ${currentFoundUser.username || 'usuario'}?`)) return;
+        newBalance = currentBalance - amountInput;
+      }
+
+      // Actualizar en Supabase en la tabla profiles
+      const { error } = await supabaseClient
+        .from('profiles')
+        .update({ balance: newBalance })
+        .eq('id', currentFoundUser.id);
+
+      if (error) {
+        alert("Error al actualizar saldo: " + error.message);
+      } else {
+        alert("¡Saldo actualizado con éxito en la plataforma!");
+        currentFoundUser.balance = newBalance;
+        document.getElementById('res-balance').innerText = newBalance.toLocaleString('es-VE');
+        document.getElementById('action-amount').value = '';
+      }
+    }
+
+    // APROBAR DEPÓSITO
+    async function processDeposit(depositId, userId, amount) {
+      if (!confirm(`¿Confirmar aprobación del depósito de ${amount} VES para ${userId}?`)) return;
+
+      const { error } = await supabaseClient
+        .from('deposits')
+        .update({ status: 'Aprobado' })
+        .eq('id', depositId);
+
+      if (error) {
+        alert("Error al aprobar depósito: " + error.message);
+      } else {
+        alert("¡Depósito marcado como Aprobado!");
+        loadData();
+      }
+    }
+
+    // APROBAR RETIRO
+    async function processWithdrawal(withdrawalId, userId, amount) {
+      if (!confirm(`¿Confirmar aprobación del retiro de ${amount} VES para ${userId}?`)) return;
+
+      const { error } = await supabaseClient
+        .from('withdrawals')
+        .update({ status: 'Aprobado' })
+        .eq('id', withdrawalId);
+
+      if (error) {
+        alert("Error al procesar retiro: " + error.message);
+      } else {
+        alert("¡Retiro marcado como Aprobado!");
+        loadData();
+      }
+    }
+
+    // RECHAZAR TRANSACCIÓN
+    async function rejectTransaction(table, id) {
+      if (!confirm(`¿Seguro que deseas rechazar esta solicitud?`)) return;
+
+      const { error } = await supabaseClient
+        .from(table)
+        .update({ status: 'Rechazado' })
+        .eq('id', id);
+
+      if (error) {
+        alert("Error al rechazar: " + error.message);
+      } else {
+        alert("Solicitud rechazada.");
+        loadData();
+      }
+    }
+
+    // Cargar al iniciar
+    loadData();
+  </script>
+</body>
+</html>

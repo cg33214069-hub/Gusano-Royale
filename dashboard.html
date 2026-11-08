@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gusanos Royale - Dashboard & Depósitos</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Inter, system-ui, sans-serif;
+    }
+
+    body {
+      background-color: #030712;
+      color: #f3f4f6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* BARRA SUPERIOR / NAVBAR */
+    .navbar {
+      background: #0b0f19;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-icon {
+      background: #0284c7;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    .brand-title {
+      font-weight: 800;
+      font-size: 1.1rem;
+      letter-spacing: 0.5px;
+      color: #ffffff;
+    }
+
+    .brand-sub {
+      font-size: 0.7rem;
+      color: #38bdf8;
+      display: block;
+      margin-top: -2px;
+    }
+
+    /* MENÚ DE NAVEGACIÓN SUPERIOR */
+    .nav-links {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .nav-link {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .nav-link:hover, .nav-link.active {
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.08);
+    }
+
+    .nav-user {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .balance-pill {
+      background: #0f172a;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 6px 14px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+    }
+
+    .balance-pill-label {
+      color: #94a3b8;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+    }
+
+    .balance-pill-value {
+      color: #38bdf8;
+      font-weight: bold;
+    }
+
+    .user-avatar {
+      background: #2563eb;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+
+    /* CONTENEDOR PRINCIPAL */
+    .main-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+      width: 100%;
+      flex: 1;
+    }
+
+    .view-section {
+      display: none;
+    }
+
+    .view-section.active {
+      display: block;
+    }
+
+    /* BANNER HERO Y MÓDULOS */
+    .hero-section {
+      background: linear-gradient(135deg, #0b132b 0%, #111827 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      background: rgba(56, 189, 248, 0.1);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+
+    .hero-title {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+
+    .hero-desc {
+      color: #94a3b8;
+      font-size: 0.9rem;
+      max-width: 600px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    /* ESTRUCTURA DASHBOARD: SALDO + PERSONALIZACIÓN */
+    .dashboard-top-grid {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    @media (max-width: 768px) {
+      .dashboard-top-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .stat-card-single {
+      background: #0b0f19;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .stat-label {
+      color: #64748b;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #4ade80;
+      margin-bottom: 4px;
+    }
+
+    .stat-sub {
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+
+    /* MÓDULO DE PERSONALIZACIÓN DE SKINS */
+    .skins-card {
+      background: #0b0f19;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    .skins-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .skins-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .active-skin-badge {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid #22c55e;
+      color: #4ade80;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+
+    .skins-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 12px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding-right: 6px;
+    }
+
+    .skins-grid::-webkit-scrollbar {
+      width: 6px;
+    }
+    .skins-grid::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+
+    .skin-item {
+      background: #0f172a;
+      border: 2px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .skin-item:hover {
+      border-color: #38bdf8;
+      transform: translateY(-2px);
+    }
+
+    .skin-item.selected {
+      border-color: #22c55e;
+      background: rgba(34, 197, 94, 0.08);
+    }
+
+    .skin-preview {
+      width: 100%;
+      height: 36px;
+      border-radius: 20px;
+      margin-bottom: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .skin-name {
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: #cbd5e1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* MÓDULOS DE DEPÓSITOS Y RETIROS */
+    .deposit-card {
+      background: #0b0f19;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .deposit-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 16px;
+    }
+
+    .methods-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .method-btn {
+      background: #0f172a;
+      border: 2px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 14px;
+      color: #fff;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .method-btn.active {
+      border-color: #38bdf8;
+      background: rgba(56, 189, 248, 0.05);
+    }
+
+    .method-name {
+      font-weight: bold;
+      font-size: 0.95rem;
+      color: #38bdf8;
+      margin-bottom: 2px;
+    }
+
+    .method-sub {
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }
+
+    .bank-info-box {
+      background: #0f172a;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+      color: #cbd5e1;
+      line-height: 1.6;
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+    }
+
+    .input-group label {
+      display: block;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .input-group input, .input-group select {
+      width: 100%;
+      padding: 12px 14px;
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: white;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    .input-group input:focus, .input-group select:focus {
+      border-color: #38bdf8;
+    }
+
+    .btn-confirm-deposit {
+      background: #22c55e;
+      color: white;
+      border: none;
+      width: 100%;
+      padding: 14px;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-confirm-deposit:hover {
+      background: #16a34a;
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 16px;
+    }
+
+    .rooms-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .room-card {
+      background: #0b0f19;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .room-card.beginner { border-top: 3px solid #38bdf8; }
+    .room-card.medium { border-top: 3px solid #a855f7; }
+    .room-card.pro { border-top: 3px solid #eab308; }
+    .room-card.vip { border-top: 3px solid #ef4444; }
+
+    .room-badge {
+      font-size: 0.65rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+      width: fit-content;
+      margin-bottom: 8px;
+    }
+
+    .beginner .room-badge { background: rgba(56, 189, 248, 0.1); color: #38bdf8; }
+    .medium .room-badge { background: rgba(168, 85, 247, 0.1); color: #a855f7; }
+    .pro .room-badge { background: rgba(234, 179, 8, 0.1); color: #eab308; }
+    .vip .room-badge { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+    .btn-play-room {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      font-weight: bold;
+      font-size: 0.85rem;
+      cursor: pointer;
+      margin-top: 16px;
+      color: white;
+    }
+    .beginner .btn-play-room { background: #0284c7; }
+    .medium .btn-play-room { background: #9333ea; }
+    .pro .btn-play-room { background: #ca8a04; }
+    .vip .btn-play-room { background: #dc2626; }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR SUPERIOR -->
+  <header class="navbar">
+    <div class="brand">
+      <div class="brand-icon">🐛</div>
+      <div>
+        <span class="brand-title">GUSANOS ROYALE</span>
+        <span class="brand-sub">ARENA DE APUESTAS VES</span>
+      </div>
+    </div>
+
+    <!-- PESTAÑAS DE NAVEGACIÓN -->
+    <nav class="nav-links">
+      <button class="nav-link active" onclick="switchTab('lobby', event)">🏠 Lobby de Salas</button>
+      <button class="nav-link" onclick="switchTab('deposit', event)">💳 Depositar</button>
+      <button class="nav-link" onclick="switchTab('withdraw', event)">💸 Retirar</button>
+      <button class="nav-link" onclick="switchTab('profile', event)">👤 Perfil & Cuentas</button>
+    </nav>
+
+    <div class="nav-user">
+      <div class="balance-pill">
+        <span class="balance-pill-label">Saldo Disponible</span>
+        <span class="balance-pill-value" id="nav-balance">100,00 VES</span>
+      </div>
+      <div class="user-avatar" id="user-avatar">CG</div>
+      <button onclick="logout()" style="background: transparent; border: none; color: #ef4444; cursor: pointer; font-size: 0.8rem; font-weight: bold;">Salir</button>
+    </div>
+  </header>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <main class="main-container">
+
+    <!-- VISTA 1: LOBBY DE SALAS -->
+    <section id="view-lobby" class="view-section active">
+      <div class="hero-section">
+        <span class="hero-badge">⚡ Sistema de Lobby en Tiempo Real</span>
+        <h1 class="hero-title">APUESTA, SOBREVIVE Y GANA BOLÍVARES</h1>
+        <p class="hero-desc">Ingresa en salas multijugador. Tienes 2 minutos de preparación sin comida ni muertes para posicionarte, seguidos de 5 minutos de combate letal.</p>
+        <div style="display: flex; gap: 12px;">
+          <button onclick="switchTab('deposit', event)" style="background: #0ea5e9; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer;">+ RECARGAR SALDO</button>
+          <button onclick="switchTab('withdraw', event)" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); color: white; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer;">SOLICITAR RETIRO</button>
+        </div>
+      </div>
+
+      <!-- SECCIÓN SUPERIOR: SALDO PRINCIPAL Y SELECTOR DE SKINS DE GUSANOS -->
+      <div class="dashboard-top-grid">
+        <div class="stat-card-single">
+          <div class="stat-label">Saldo Total</div>
+          <div class="stat-value" id="stat-balance">100,00 VES</div>
+          <div class="stat-sub">Disponible para tus partidas</div>
+        </div>
+
+        <div class="skins-card">
+          <div class="skins-header">
+            <div class="skins-title">🎨 Personalizar Gusano (100 Diseños)</div>
+            <div class="active-skin-badge" id="active-skin-badge">Equipado: Venezuela 🇻🇪</div>
+          </div>
+          <div class="skins-grid" id="skins-grid">
+            <!-- Se generan dinámicamente los diseños de alta calidad -->
+          </div>
+        </div>
+      </div>
+
+      <h2 class="section-title">🔹 SALAS DISPONIBLES EN VIVO</h2>
+      <div class="rooms-grid">
+        <div class="room-card beginner">
+          <span class="room-badge">NOBATUM</span>
+          <h3>Sala Principiantes</h3>
+          <p style="font-size: 0.75rem; color: #64748b; margin: 8px 0 16px;">Ideal para entrenamiento rápido.</p>
+          <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:6px;"><span style="color:#64748b;">Entrada:</span><strong style="color:#fff;">50 VES</strong></div>
+          <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span style="color:#64748b;">Pozo Est.:</span><strong style="color:#fff;">500 VES</strong></div>
+          <button class="btn-play-room" onclick="selectRoom(50)">ENTRAR A JUGAR</button>
+        </div>
+
+        <div class="room-card medium">
+          <span class="room-badge">INTERMEDIA</span>
+          <h3>Sala Media</h3>
+          <p style="font-size: 0.75rem; color: #64748b; margin: 8px 0 16px;">Competencia moderada.</p>
+          <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:6px;"><span style="color:#64748b;">Entrada:</span><strong style="color:#fff;">100 VES</strong></div>
+          <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span style="color:#64748b;">Pozo Est.:</span><strong style="color:#fff;">1.000 VES</strong></div>
+          <button class="btn-play-room" onclick="selectRoom(100)">ENTRAR A JUGAR</button>
+        </div>
+
+        <div class="room-card pro">
+          <span class="room-badge">ÉLITE</span>
+          <h3>Sala Profesional</h3>
+          <p style="font-size: 0.75rem; color: #64748b; margin: 8px 0 16px;">Para jugadores experimentados.</p>
+          <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:6px;"><span style="color:#64748b;">Entrada:</span><strong style="color:#fff;">500 VES</strong></div>
+          <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span style="color:#64748b;">Pozo Est.:</span><strong style="color:#fff;">5.000 VES</strong></div>
+          <button class="btn-play-room" onclick="selectRoom(500)">ENTRAR A JUGAR</button>
+        </div>
+
+        <div class="room-card vip">
+          <span class="room-badge">HIGH ROLLER</span>
+          <h3>Sala VIP SBRk</h3>
+          <p style="font-size: 0.75rem; color: #64748b; margin: 8px 0 16px;">Grandes apuestas y premios.</p>
+          <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:6px;"><span style="color:#64748b;">Entrada:</span><strong style="color:#fff;">1.000 VES</strong></div>
+          <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span style="color:#64748b;">Pozo Est.:</span><strong style="color:#fff;">10.000 VES</strong></div>
+          <button class="btn-play-room" onclick="selectRoom(1000)">ENTRAR A JUGAR</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VISTA 2: MÓDULO DE DEPÓSITOS -->
+    <section id="view-deposit" class="view-section">
+      <div class="deposit-card">
+        <h2 class="deposit-title">💳 MÓDULO DE DEPÓSITOS</h2>
+        <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px;">Recarga tu cuenta al instante mediante métodos locales.</p>
+
+        <label style="display:block; font-size:0.8rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase; font-weight:600;">Selecciona Método de Pago</label>
+        
+        <div class="methods-grid">
+          <div class="method-btn active" onclick="selectPaymentMethod('pago_movil')" id="btn-pago_movil">
+            <div class="method-name">Pago Móvil</div>
+            <div class="method-sub">Datos Bancarios Móvil</div>
+          </div>
+          <div class="method-btn" onclick="selectPaymentMethod('transferencia')" id="btn-transferencia">
+            <div class="method-name">Transferencia</div>
+            <div class="method-sub">Cuenta Bancaria</div>
+          </div>
+          <div class="method-btn" onclick="selectPaymentMethod('pago_ubii')" id="btn-pago_ubii">
+            <div class="method-name">Pago Ubii</div>
+            <div class="method-sub">Correo / Cuenta Ubii</div>
+          </div>
+        </div>
+
+        <label style="display:block; font-size:0.8rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase; font-weight:600;">Datos para realizar el pago:</label>
+        <div id="payment-info-box" class="bank-info-box">
+          Cargando datos de pago...
+        </div>
+
+        <div class="input-group">
+          <label for="deposit-amount">Monto a Depositar (VES)</label>
+          <input type="number" id="deposit-amount" placeholder="Ej. 1000">
+        </div>
+
+        <div class="input-group">
+          <label for="deposit-reference">Número de Referencia o Hash</label>
+          <input type="text" id="deposit-reference" placeholder="Últimos 6 dígitos de la referencia bancaria">
+        </div>
+
+        <button class="btn-confirm-deposit" onclick="submitDeposit()">CONFIRMAR REGISTRO DE DEPÓSITO</button>
+      </div>
+    </section>
+
+    <!-- VISTA 3: RETIRAR -->
+    <section id="view-withdraw" class="view-section">
+      <div class="deposit-card">
+        <h2 class="deposit-title">💸 MÓDULO DE RETIROS</h2>
+        <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px;">Selecciona tu cuenta bancaria guardada y solicita tu pago por Pago Móvil.</p>
+
+        <div class="input-group">
+          <label for="withdraw-amount">Monto a Retirar (VES)</label>
+          <input type="number" id="withdraw-amount" placeholder="Ej. 500">
+        </div>
+
+        <div class="input-group">
+          <label for="saved-accounts-select">Selecciona tu Cuenta Bancaria Guardada</label>
+          <select id="saved-accounts-select">
+            <option value="">Cargando cuentas...</option>
+          </select>
+          <small style="color: #64748b; font-size: 0.75rem; margin-top: 4px; display: block;">¿No aparece ninguna cuenta? Ve a la pestaña "Perfil & Cuentas" para registrar tus datos.</small>
+        </div>
+
+        <button class="btn-confirm-deposit" style="background: #eab308; color: #000; margin-top: 10px;" onclick="submitWithdrawal()">SOLICITAR RETIRO PAGO MÓVIL</button>
+      </div>
+    </section>
+
+    <!-- VISTA 4: PERFIL Y DATOS BANCARIOS -->
+    <section id="view-profile" class="view-section">
+      <div class="deposit-card">
+        <h2 class="deposit-title">👤 Perfil y Datos Bancarios</h2>
+        <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px;" id="profile-email">Cargando datos de perfil...</p>
+
+        <!-- SECCIÓN DE SOPORTE VÍA WHATSAPP -->
+        <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="font-weight: bold; color: #4ade80; font-size: 0.95rem; margin-bottom: 4px;">💬 Soporte y Asistencia por WhatsApp</div>
+            <div style="font-size: 0.8rem; color: #cbd5e1;">¿Tienes problemas con tus pagos, retiros o el saldo? Contáctanos directamente.</div>
+          </div>
+          <a href="https://wa.me/584123915398?text=Hola,%20tengo%20una%20consulta%20con%20Gusanos%20Royale" target="_blank" style="background: #22c55e; color: white; padding: 10px 18px; border-radius: 8px; font-weight: bold; text-decoration: none; font-size: 0.85rem;">Contactar Soporte</a>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin-bottom: 20px;">
+
+        <h3 style="font-size: 1rem; color: #38bdf8; margin-bottom: 12px;">Registrar o Actualizar Datos de Pago Móvil</h3>
+        <p style="color: #94a3b8; font-size: 0.8rem; margin-bottom: 16px;">Estos datos se guardarán en el sistema para cuando solicites tus retiros.</p>
+
+        <div class="input-group">
+          <label for="bank-name">Nombre del Banco</label>
+          <input type="text" id="bank-name" placeholder="Ej. Banesco / Banco de Venezuela">
+        </div>
+
+        <div class="input-group">
+          <label for="bank-phone">Número de Teléfono</label>
+          <input type="text" id="bank-phone" placeholder="Ej. 04121234567">
+        </div>
+
+        <div class="input-group">
+          <label for="bank-idcard">Cédula de Identidad</label>
+          <input type="text" id="bank-idcard" placeholder="Ej. V-26854120">
+        </div>
+
+        <button class="btn-confirm-deposit" onclick="saveBankAccount()">GUARDAR DATOS BANCARIOS</button>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
+    
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let selectedPaymentMethod = 'pago_movil';
+
+    // LISTADO DE 100 SKINS / DISEÑOS DE GUSANOS
+    const SKINS_LIST = [
+      { id: 've', name: 'Venezuela 🇻🇪', style: 'linear-gradient(90deg, #ffcc00 33%, #00247d 33%, #00247d 66%, #cf142b 66%)' },
+      { id: 'neon_cyber', name: 'Neón Cyberpunk', style: 'linear-gradient(90deg, #00f2fe 0%, #4facfe 100%)' },
+      { id: 'fire', name: 'Neón Fuego', style: 'linear-gradient(90deg, #ff0844 0%, #ffb199 100%)' },
+      { id: 'violet', name: 'Neón Violeta', style: 'linear-gradient(90deg, #b224ef 0%, #7579ff 100%)' },
+      { id: 'camo', name: 'Camuflaje Militar', style: 'linear-gradient(90deg, #4b5320 0%, #8b8c7a 50%, #2e3b23 100%)' },
+      { id: 'gold', name: 'Dorado VIP', style: 'linear-gradient(90deg, #bf953f 0%, #fcf6ba 25%, #b38728 50%, #fbf5b7 75%, #aa771c 100%)' },
+      { id: 'rainbow', name: 'Arcoíris', style: 'linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet)' },
+      { id: 'crimson', name: 'Dragón Carmesí', style: 'linear-gradient(90deg, #870003 0%, #ff0000 100%)' },
+      { id: 'emerald', name: 'Escamas Esmeralda', style: 'linear-gradient(90deg, #0ba360 0%, #3cba92 100%)' }
+    ];
+
+    // Generar dinámicamente hasta 100 diseños de gusanos
+    for (let i = 10; i <= 100; i++) {
+      const hue = (i * 137.5) % 360;
+      SKINS_LIST.push({
+        id: `skin_${i}`,
+        name: `Skin Épica #${i}`,
+        style: `linear-gradient(90deg, hsl(${hue}, 80%, 50%), hsl(${(hue + 40) % 360}, 80%, 40%))`
+      });
+    }
+
+    function renderSkins() {
+      const grid = document.getElementById('skins-grid');
+      const currentSkin = localStorage.getItem('selected_skin') || 've';
+      
+      grid.innerHTML = SKINS_LIST.map(skin => {
+        const isSelected = skin.id === currentSkin;
+        if (isSelected) {
+          const badge = document.getElementById('active-skin-badge');
+          if (badge) badge.innerText = `Equipado: ${skin.name}`;
+        }
+        return `
+          <div class="skin-item ${isSelected ? 'selected' : ''}" onclick="selectSkin('${skin.id}', '${skin.name}')">
+            <div class="skin-preview" style="background: ${skin.style}"></div>
+            <div class="skin-name">${skin.name}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectSkin(skinId, skinName) {
+      localStorage.setItem('selected_skin', skinId);
+      renderSkins();
+    }
+
+    // Sistema de Pestañas
+    function switchTab(tabId, event) {
+      document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+
+      const target = document.getElementById(`view-${tabId}`);
+      if (target) target.classList.add('active');
+
+      if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+      }
+
+      if (tabId === 'withdraw') {
+        loadUserBankAccount();
+      }
+    }
+
+    // Obtener identificador del usuario actual
+    function getUserIdentifier() {
+      let userIdentifier = localStorage.getItem('user_email') || localStorage.getItem('user_id');
+      return userIdentifier || "Usuario Sin Sesión";
+    }
+
+    // Cambiar método de depósito desde Supabase
+    async function selectPaymentMethod(method) {
+      selectedPaymentMethod = method;
+      ['pago_movil', 'transferencia', 'pago_ubii'].forEach(m => {
+        const btn = document.getElementById(`btn-${m}`);
+        if (btn) {
+          if (m === method) btn.classList.add('active');
+          else btn.classList.remove('active');
+        }
+      });
+
+      const infoBox = document.getElementById('payment-info-box');
+      infoBox.innerHTML = "Cargando datos...";
+
+      const { data, error } = await supabaseClient
+        .from('payment_settings')
+        .select('content')
+        .eq('method_code', method)
+        .maybeSingle();
+
+      if (error || !data) {
+        infoBox.innerHTML = "No hay información configurada para este método en Supabase.";
+      } else {
+        infoBox.innerHTML = data.content;
+      }
+    }
+
+    async function loadUserData() {
+      try {
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if (user) {
+          localStorage.setItem('user_id', user.id);
+          localStorage.setItem('user_email', user.email);
+
+          const { data } = await supabaseClient
+            .from('profiles')
+            .select('username, balance')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (data) {
+            const username = data.username || user.email.split('@')[0];
+            const balance = Number(data.balance || 0);
+
+            document.getElementById('nav-balance').innerText = `${balance.toLocaleString('es-VE')} VES`;
+            document.getElementById('stat-balance').innerText = `${balance.toLocaleString('es-VE')} VES`;
+            document.getElementById('user-avatar').innerText = username.substring(0, 2).toUpperCase();
+            document.getElementById('profile-email').innerText = `Correo: ${user.email} | Usuario: ${username}`;
+            localStorage.setItem('player_name', username);
+          }
+        }
+      } catch (e) {
+        console.log("Modo local");
+      }
+    }
+
+    // Guardar datos bancarios del usuario
+    async function saveBankAccount() {
+      const bankName = document.getElementById('bank-name').value.trim();
+      const phone = document.getElementById('bank-phone').value.trim();
+      const idCard = document.getElementById('bank-idcard').value.trim();
+
+      if (!bankName || !phone || !idCard) {
+        alert("Por favor completa todos los campos bancarios.");
+        return;
+      }
+
+      const userIdentifier = getUserIdentifier();
+
+      const { data: existing } = await supabaseClient
+        .from('user_bank_accounts')
+        .select('id')
+        .eq('user_id', userIdentifier)
+        .maybeSingle();
+
+      let error;
+      if (existing) {
+        const res = await supabaseClient
+          .from('user_bank_accounts')
+          .update({ bank_name: bankName, phone: phone, id_card: idCard })
+          .eq('user_id', userIdentifier);
+        error = res.error;
+      } else {
+        const res = await supabaseClient
+          .from('user_bank_accounts')
+          .insert([{ user_id: userIdentifier, bank_name: bankName, phone: phone, id_card: idCard }]);
+        error = res.error;
+      }
+
+      if (error) {
+        alert("Error al guardar los datos bancarios: " + error.message);
+      } else {
+        alert("¡Datos bancarios guardados con éxito en el sistema!");
+      }
+    }
+
+    // Cargar cuenta bancaria guardada
+    async function loadUserBankAccount() {
+      const userIdentifier = getUserIdentifier();
+      const selectElement = document.getElementById('saved-accounts-select');
+
+      const { data, error } = await supabaseClient
+        .from('user_bank_accounts')
+        .select('*')
+        .eq('user_id', userIdentifier);
+
+      if (error || !data || data.length === 0) {
+        selectElement.innerHTML = `<option value="">No tienes cuentas guardadas. Regístrala en Perfil</option>`;
+        return;
+      }
+
+      selectElement.innerHTML = data.map(acc => `
+        <option value="${acc.bank_name} | ${acc.phone} | ${acc.id_card}">
+          ${acc.bank_name} | Tel: ${acc.phone} | Cédula: ${acc.id_card}
+        </option>
+      `).join('');
+
+      if (data[0]) {
+        document.getElementById('bank-name').value = data[0].bank_name || '';
+        document.getElementById('bank-phone').value = data[0].phone || '';
+        document.getElementById('bank-idcard').value = data[0].id_card || '';
+      }
+    }
+
+    // Registrar depósito
+    async function submitDeposit() {
+      const amountInput = document.getElementById('deposit-amount').value;
+      const referenceInput = document.getElementById('deposit-reference').value.trim();
+
+      const amount = parseFloat(amountInput);
+      if (!amount || amount <= 0) {
+        alert("Por favor ingresa un monto válido a depositar.");
+        return;
+      }
+      if (!referenceInput) {
+        alert("Por favor ingresa el número de referencia o hash.");
+        return;
+      }
+
+      const userIdentifier = getUserIdentifier();
+
+      const { error } = await supabaseClient.from('deposits').insert([
+        {
+          user_id: userIdentifier,
+          method: selectedPaymentMethod,
+          amount: amount,
+          reference: referenceInput,
+          status: 'Pendiente'
+        }
+      ]);
+
+      if (error) {
+        alert("Error al registrar el depósito: " + error.message);
+      } else {
+        alert("¡Depósito registrado con éxito!");
+        document.getElementById('deposit-amount').value = '';
+        document.getElementById('deposit-reference').value = '';
+      }
+    }
+
+    // Solicitar retiro
+    async function submitWithdrawal() {
+      const amountInput = document.getElementById('withdraw-amount').value;
+      const selectElement = document.getElementById('saved-accounts-select').value;
+
+      const amount = parseFloat(amountInput);
+
+      if (!amount || amount <= 0) {
+        alert("Por favor ingresa un monto válido a retirar.");
+        return;
+      }
+      if (!selectElement) {
+        alert("Por favor selecciona una cuenta bancaria guardada.");
+        return;
+      }
+
+      const userIdentifier = getUserIdentifier();
+
+      const { error } = await supabaseClient.from('withdrawals').insert([
+        {
+          user_id: userIdentifier,
+          method: 'Pago Móvil',
+          amount: amount,
+          account_details: selectElement,
+          status: 'Pendiente'
+        }
+      ]);
+
+      if (error) {
+        alert("Error al solicitar el retiro: " + error.message);
+      } else {
+        alert("¡Solicitud de retiro enviada con éxito!");
+        document.getElementById('withdraw-amount').value = '';
+      }
+    }
+
+    // ENTRAR A LA SALA: Descuenta saldo en Supabase de forma segura y arranca la partida
+    async function selectRoom(entryFee) {
+      if (!confirm(`¿Deseas entrar a la sala por ${entryFee} VES? Se descontará de tu saldo disponible.`)) return;
+
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      let profile = null;
+
+      if (user) {
+        const { data } = await supabaseClient
+          .from('profiles')
+          .select('id, balance')
+          .eq('id', user.id)
+          .maybeSingle();
+        profile = data;
+      }
+
+      if (!profile) {
+        const { data: allProfiles } = await supabaseClient
+          .from('profiles')
+          .select('id, balance')
+          .limit(1);
+        if (allProfiles && allProfiles.length > 0) {
+          profile = allProfiles[0];
+        }
+      }
+
+      if (!profile) {
+        alert("No se encontró tu perfil en la base de datos. Por favor vuelve a iniciar sesión.");
+        return;
+      }
+
+      const currentBalance = Number(profile.balance || 0);
+
+      if (currentBalance < entryFee) {
+        alert(`Saldo insuficiente. Tienes ${currentBalance} VES y necesitas ${entryFee} VES para entrar a esta sala.`);
+        return;
+      }
+
+      const newBalance = currentBalance - entryFee;
+
+      const { error: updateError } = await supabaseClient
+        .from('profiles')
+        .update({ balance: newBalance })
+        .eq('id', profile.id);
+
+      if (updateError) {
+        alert("Error al procesar el pago de entrada: " + updateError.message);
+        return;
+      }
+
+      localStorage.setItem('selected_entry', entryFee);
+      alert(`¡Entrada pagada con éxito! Saldo restante: ${newBalance} VES. ¡A jugar!`);
+      window.location.href = 'game.html';
+    }
+
+    async function logout() {
+      await supabaseClient.auth.signOut();
+      localStorage.clear();
+      window.location.href = 'index.html';
+    }
+
+    // Inicializar al cargar
+    loadUserData();
+    renderSkins();
+    selectPaymentMethod('pago_movil');
+    loadUserBankAccount();
+  </script>
+</body>
+</html>

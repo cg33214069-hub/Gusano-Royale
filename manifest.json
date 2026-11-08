@@ -1,0 +1,14 @@
+{
+  "background_color": "#030712",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "Gusanos Royale",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "Gusanos",
+  "start_url": "/",
+  "theme_color": "#ffffff",
+  "id": "com.gusanos.royale",
+  "description": "Un emocionante juego de acción multijugador estilo Battle Royale Exprés donde compites, comes oros y sobrevives para ganar premios.",
+  "lang": "es"
+}
