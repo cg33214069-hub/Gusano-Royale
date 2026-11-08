@@ -381,33 +381,6 @@
       line-height: 1.6;
     }
 
-    /* ESTILO PARA LOS DATOS BANCARIOS CON BOTÓN DE COPIAR */
-    .copy-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #030712;
-      padding: 10px 14px;
-      border-radius: 8px;
-      border: 1px solid rgba(255,255,255,0.05);
-      margin-bottom: 8px;
-    }
-    .copy-btn {
-      background: #38bdf8;
-      color: #000;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-weight: bold;
-      font-size: 0.8rem;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .copy-btn:hover {
-      background: #0ea5e9;
-      color: #fff;
-    }
-
     .input-group {
       margin-bottom: 16px;
     }
@@ -800,16 +773,7 @@
       return userIdentifier || "Usuario Sin Sesión";
     }
 
-    // Función para copiar texto al portapapeles con alerta visual
-    function copiarTexto(texto) {
-      navigator.clipboard.writeText(texto).then(() => {
-        alert("¡Copiado al portapapeles: " + texto + "!");
-      }).catch(err => {
-        alert("No se pudo copiar automáticamente.");
-      });
-    }
-
-    // Cambiar método de depósito desde Supabase e integrar botones de copiar
+    // Cambiar método de depósito desde Supabase
     async function selectPaymentMethod(method) {
       selectedPaymentMethod = method;
       ['pago_movil', 'transferencia', 'pago_ubii'].forEach(m => {
@@ -832,13 +796,7 @@
       if (error || !data) {
         infoBox.innerHTML = "No hay información configurada para este método en Supabase.";
       } else {
-        // Envolvemos el contenido de Supabase y agregamos botones de copia inteligentes si se desea
-        infoBox.innerHTML = `
-          <div style="margin-bottom: 12px; white-space: pre-line;">${data.content}</div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
-            <button class="copy-btn" onclick="copiarTexto('${data.content.replace(/'/g, "\\'")}')">📋 Copiar Todos los Datos</button>
-          </div>
-        `;
+        infoBox.innerHTML = data.content;
       }
     }
 
@@ -996,7 +954,7 @@
       const { error } = await supabaseClient.from('withdrawals').insert([
         {
           user_id: userIdentifier,
-          method: 'pago_movil',
+          method: 'Pago Móvil',
           amount: amount,
           account_details: selectElement,
           status: 'Pendiente'
@@ -1011,12 +969,72 @@
       }
     }
 
-    // Inicializar al cargar la página
-    window.onload = () => {
-      renderSkins();
-      loadUserData();
-      selectPaymentMethod('pago_movil');
-    };
+    // ENTRAR A LA SALA: Descuenta saldo en Supabase de forma segura y arranca la partida
+    async function selectRoom(entryFee) {
+      if (!confirm(`¿Deseas entrar a la sala por ${entryFee} VES? Se descontará de tu saldo disponible.`)) return;
+
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      let profile = null;
+
+      if (user) {
+        const { data } = await supabaseClient
+          .from('profiles')
+          .select('id, balance')
+          .eq('id', user.id)
+          .maybeSingle();
+        profile = data;
+      }
+
+      if (!profile) {
+        const { data: allProfiles } = await supabaseClient
+          .from('profiles')
+          .select('id, balance')
+          .limit(1);
+        if (allProfiles && allProfiles.length > 0) {
+          profile = allProfiles[0];
+        }
+      }
+
+      if (!profile) {
+        alert("No se encontró tu perfil en la base de datos. Por favor vuelve a iniciar sesión.");
+        return;
+      }
+
+      const currentBalance = Number(profile.balance || 0);
+
+      if (currentBalance < entryFee) {
+        alert(`Saldo insuficiente. Tienes ${currentBalance} VES y necesitas ${entryFee} VES para entrar a esta sala.`);
+        return;
+      }
+
+      const newBalance = currentBalance - entryFee;
+
+      const { error: updateError } = await supabaseClient
+        .from('profiles')
+        .update({ balance: newBalance })
+        .eq('id', profile.id);
+
+      if (updateError) {
+        alert("Error al procesar el pago de entrada: " + updateError.message);
+        return;
+      }
+
+      localStorage.setItem('selected_entry', entryFee);
+      alert(`¡Entrada pagada con éxito! Saldo restante: ${newBalance} VES. ¡A jugar!`);
+      window.location.href = 'game.html';
+    }
+
+    async function logout() {
+      await supabaseClient.auth.signOut();
+      localStorage.clear();
+      window.location.href = 'index.html';
+    }
+
+    // Inicializar al cargar
+    loadUserData();
+    renderSkins();
+    selectPaymentMethod('pago_movil');
+    loadUserBankAccount();
   </script>
 </body>
-</html>
+</html> 
