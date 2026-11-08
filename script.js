@@ -58,7 +58,6 @@ const myPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
 let remotePlayers = {}; 
 let sharedLootOrbs = []; // Esferas de botín compartidas en tiempo real
 
-// Verificamos que el cliente de Supabase esté disponible
 if (typeof supabaseClient !== 'undefined' && supabaseClient) {
   gameRoom = supabaseClient.channel('arena_principal', {
     config: { broadcast: { self: false } }
@@ -145,6 +144,9 @@ function dropLootOnDeath(x, y, totalVes) {
   }
 }
 
+// Control de tiempo para evitar saturación de red (Error 429)
+let lastSendTime = 0;
+
 function updateLocalPlayer() {
   if (!player.alive) return;
 
@@ -198,22 +200,26 @@ function updateLocalPlayer() {
     }
   }
 
-  // Enviar nuestra posición a la red
+  // Enviar nuestra posición con límite de tiempo (cada 250ms) para evitar error 429
   if (gameRoom && gameActive) {
-    gameRoom.send({
-      type: 'broadcast',
-      event: 'player_move',
-      payload: {
-        id: player.id,
-        name: player.name,
-        x: player.x,
-        y: player.y,
-        angle: player.angle,
-        ves: player.ves,
-        skinId: player.skinId,
-        body: player.body.slice(0, 15)
-      }
-    });
+    const now = Date.now();
+    if (now - lastSendTime > 250) {
+      lastSendTime = now;
+      gameRoom.send({
+        type: 'broadcast',
+        event: 'player_move',
+        payload: {
+          id: player.id,
+          name: player.name,
+          x: player.x,
+          y: player.y,
+          angle: player.angle,
+          ves: player.ves,
+          skinId: player.skinId,
+          body: player.body.slice(0, 15)
+        }
+      });
+    }
   }
 }
 
@@ -272,7 +278,6 @@ function checkRealPlayerCollisions() {
         if (Math.hypot(player.x - seg.x, player.y - seg.y) < 14) {
           player.alive = false;
           
-          // Soltar botín al morir
           dropLootOnDeath(player.x, player.y, player.ves);
 
           if (gameRoom) {
@@ -336,7 +341,6 @@ function gameLoop() {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
     }
 
-    // Dibujar las esferas de botín compartidas en el mapa
     sharedLootOrbs.forEach(orb => {
       const sx = orb.x - camera.x;
       const sy = orb.y - camera.y;
@@ -374,7 +378,6 @@ function endGame(survived, reason) {
 
   const finalAmount = survived ? Math.floor(player.ves) : 0;
 
-  // Llamamos a la función de recompensa en game.html para sumar los VES a Supabase
   if (survived && typeof finishGameAndReward === 'function') {
     finishGameAndReward(finalAmount);
   }
