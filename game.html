@@ -55,53 +55,6 @@
       border-radius: 50%; overflow: hidden; z-index: 10;
     }
 
-    /* CONTROLES TÁCTILES VIRTUALES (D-PAD) */
-    #mobile-controls {
-      position: fixed;
-      bottom: 25px;
-      left: 25px;
-      z-index: 9999;
-      touch-action: manipulation;
-    }
-    .dpad-container {
-      display: grid;
-      grid-template-columns: repeat(3, 55px);
-      grid-template-rows: repeat(3, 55px);
-      gap: 5px;
-      background: rgba(15, 23, 42, 0.6);
-      padding: 8px;
-      border-radius: 50%;
-      backdrop-filter: blur(4px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-    .dpad-btn {
-      background: rgba(56, 189, 248, 0.35);
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      color: white;
-      font-size: 20px;
-      border-radius: 12px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      touch-action: manipulation;
-    }
-    .dpad-btn:active, .dpad-btn.pressed {
-      background: rgba(34, 197, 94, 0.8);
-    }
-    #btn-up { grid-column: 2; grid-row: 1; }
-    #btn-left { grid-column: 1; grid-row: 2; }
-    #btn-right { grid-column: 3; grid-row: 2; }
-    #btn-down { grid-column: 2; grid-row: 3; }
-
-    #boost-btn {
-      position: absolute; bottom: 35px; right: 25px; width: 75px; height: 75px; border-radius: 50%;
-      background: radial-gradient(circle, #38bdf8 0%, #0284c7 100%); border: 2px solid #7dd3fc;
-      color: white; font-weight: bold; font-size: 0.85rem; display: flex; justify-content: center;
-      align-items: center; cursor: pointer; z-index: 10; touch-action: manipulation;
-      box-shadow: 0 4px 15px rgba(56, 189, 248, 0.4);
-    }
-    #boost-btn:active { transform: scale(0.95); }
-
     .modal-overlay {
       position: absolute; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(8, 11, 18, 0.92); display: flex; justify-content: center; align-items: center; z-index: 100;
@@ -136,18 +89,6 @@
   <canvas id="gameCanvas"></canvas>
   <canvas id="minimap"></canvas>
 
-  <!-- CONTROLES TÁCTILES FLOTANTES EN PANTALLA -->
-  <div id="mobile-controls">
-    <div class="dpad-container">
-      <button class="dpad-btn" id="btn-up">⬆️</button>
-      <button class="dpad-btn" id="btn-left">⬅️</button>
-      <button class="dpad-btn" id="btn-right">➡️</button>
-      <button class="dpad-btn" id="btn-down">⬇️</button>
-    </div>
-  </div>
-
-  <div id="boost-btn">TURBO</div>
-
   <!-- Modal de Fin de Partida -->
   <div class="modal-overlay" id="end-modal" style="display: none;">
     <div class="modal">
@@ -174,44 +115,6 @@
       window.location.href = 'dashboard.html';
     }
   }
-
-  // CONECTAR BOTONES TÁCTILES VIRTUALES CON EL JUEGO
-  function simulateKey(keyName, eventType) {
-    const event = new KeyboardEvent(eventType, { key: keyName, bubbles: true });
-    window.dispatchEvent(event);
-  }
-
-  const dpadBindings = {
-    'btn-up': 'ArrowUp',
-    'btn-down': 'ArrowDown',
-    'btn-left': 'ArrowLeft',
-    'btn-right': 'ArrowRight'
-  };
-
-  Object.keys(dpadBindings).forEach(btnId => {
-    const btn = document.getElementById(btnId);
-    if (btn) {
-      btn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        btn.classList.add('pressed');
-        simulateKey(dpadBindings[btnId], 'keydown');
-      });
-      btn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        btn.classList.remove('pressed');
-        simulateKey(dpadBindings[btnId], 'keyup');
-      });
-      // Soporte para pruebas desde PC con mouse
-      btn.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        simulateKey(dpadBindings[btnId], 'keydown');
-      });
-      btn.addEventListener('mouseup', (e) => {
-        e.preventDefault();
-        simulateKey(dpadBindings[btnId], 'keyup');
-      });
-    }
-  });
 
   // FUNCIÓN DE RESPALDO PARA SUMAR GANANCIAS EN SUPABASE
   async function finishGameAndReward(amountWon) {
