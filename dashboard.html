@@ -4,6 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gusanos Royale - Dashboard & Depósitos</title>
+  
+  <!-- CONFIGURACIÓN PWA PARA INSTALACIÓN REAL -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#030712">
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(() => console.log("App lista para instalar"))
+          .catch((err) => console.log("Error Service Worker:", err));
+      });
+    }
+  </script>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
@@ -716,7 +730,6 @@
       { id: 'emerald', name: 'Escamas Esmeralda', style: 'linear-gradient(90deg, #0ba360 0%, #3cba92 100%)' }
     ];
 
-    // Generar dinámicamente hasta 100 diseños de gusanos
     for (let i = 10; i <= 100; i++) {
       const hue = (i * 137.5) % 360;
       SKINS_LIST.push({
@@ -750,7 +763,6 @@
       renderSkins();
     }
 
-    // Sistema de Pestañas
     function switchTab(tabId, event) {
       document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
@@ -767,13 +779,11 @@
       }
     }
 
-    // Obtener identificador del usuario actual
     function getUserIdentifier() {
       let userIdentifier = localStorage.getItem('user_email') || localStorage.getItem('user_id');
       return userIdentifier || "Usuario Sin Sesión";
     }
 
-    // Cambiar método de depósito desde Supabase
     async function selectPaymentMethod(method) {
       selectedPaymentMethod = method;
       ['pago_movil', 'transferencia', 'pago_ubii'].forEach(m => {
@@ -829,7 +839,6 @@
       }
     }
 
-    // Guardar datos bancarios del usuario
     async function saveBankAccount() {
       const bankName = document.getElementById('bank-name').value.trim();
       const phone = document.getElementById('bank-phone').value.trim();
@@ -869,7 +878,6 @@
       }
     }
 
-    // Cargar cuenta bancaria guardada
     async function loadUserBankAccount() {
       const userIdentifier = getUserIdentifier();
       const selectElement = document.getElementById('saved-accounts-select');
@@ -897,42 +905,6 @@
       }
     }
 
-    // Registrar depósito
-    async function submitDeposit() {
-      const amountInput = document.getElementById('deposit-amount').value;
-      const referenceInput = document.getElementById('deposit-reference').value.trim();
-
-      const amount = parseFloat(amountInput);
-      if (!amount || amount <= 0) {
-        alert("Por favor ingresa un monto válido a depositar.");
-        return;
-      }
-      if (!referenceInput) {
-        alert("Por favor ingresa el número de referencia o hash.");
-        return;
-      }
-
-      const userIdentifier = getUserIdentifier();
-
-      const { error } = await supabaseClient.from('deposits').insert([
-        {
-          user_id: userIdentifier,
-          method: selectedPaymentMethod,
-          amount: amount,
-          reference: referenceInput,
-          status: 'Pendiente'
-        }
-      ]);
-
-      if (error) {
-        alert("Error al registrar el depósito: " + error.message);
-      } else {
-        alert("¡Depósito registrado con éxito!");
-        document.getElementById('deposit-amount').value = '';
-        document.getElementById('deposit-reference').value = '';
-      }
-    }
-
     // Solicitar retiro
     async function submitWithdrawal() {
       const amountInput = document.getElementById('withdraw-amount').value;
@@ -950,13 +922,12 @@
       }
 
       const userIdentifier = getUserIdentifier();
-
+      
       const { error } = await supabaseClient.from('withdrawals').insert([
         {
           user_id: userIdentifier,
-          method: 'Pago Móvil',
           amount: amount,
-          account_details: selectElement,
+          bank_details: selectElement,
           status: 'Pendiente'
         }
       ]);
@@ -968,73 +939,3 @@
         document.getElementById('withdraw-amount').value = '';
       }
     }
-
-    // ENTRAR A LA SALA: Descuenta saldo en Supabase de forma segura y arranca la partida
-    async function selectRoom(entryFee) {
-      if (!confirm(`¿Deseas entrar a la sala por ${entryFee} VES? Se descontará de tu saldo disponible.`)) return;
-
-      const { data: { user } } = await supabaseClient.auth.getUser();
-      let profile = null;
-
-      if (user) {
-        const { data } = await supabaseClient
-          .from('profiles')
-          .select('id, balance')
-          .eq('id', user.id)
-          .maybeSingle();
-        profile = data;
-      }
-
-      if (!profile) {
-        const { data: allProfiles } = await supabaseClient
-          .from('profiles')
-          .select('id, balance')
-          .limit(1);
-        if (allProfiles && allProfiles.length > 0) {
-          profile = allProfiles[0];
-        }
-      }
-
-      if (!profile) {
-        alert("No se encontró tu perfil en la base de datos. Por favor vuelve a iniciar sesión.");
-        return;
-      }
-
-      const currentBalance = Number(profile.balance || 0);
-
-      if (currentBalance < entryFee) {
-        alert(`Saldo insuficiente. Tienes ${currentBalance} VES y necesitas ${entryFee} VES para entrar a esta sala.`);
-        return;
-      }
-
-      const newBalance = currentBalance - entryFee;
-
-      const { error: updateError } = await supabaseClient
-        .from('profiles')
-        .update({ balance: newBalance })
-        .eq('id', profile.id);
-
-      if (updateError) {
-        alert("Error al procesar el pago de entrada: " + updateError.message);
-        return;
-      }
-
-      localStorage.setItem('selected_entry', entryFee);
-      alert(`¡Entrada pagada con éxito! Saldo restante: ${newBalance} VES. ¡A jugar!`);
-      window.location.href = 'game.html';
-    }
-
-    async function logout() {
-      await supabaseClient.auth.signOut();
-      localStorage.clear();
-      window.location.href = 'index.html';
-    }
-
-    // Inicializar al cargar
-    loadUserData();
-    renderSkins();
-    selectPaymentMethod('pago_movil');
-    loadUserBankAccount();
-  </script>
-</body>
-</html>
