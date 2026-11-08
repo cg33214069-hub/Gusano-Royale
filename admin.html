@@ -201,7 +201,7 @@
     <div class="search-box-card">
       <h2 style="font-size: 1rem; color: #38bdf8; text-transform: uppercase;">🔍 Búsqueda y Gestión Rápida de Saldo de Usuario</h2>
       <div class="search-input-group">
-        <input type="text" id="search-user-input" placeholder="Ingresa el correo o nombre de usuario (ej. bmx55321@gmail.com)">
+        <input type="text" id="search-user-input" placeholder="Ingresa el nombre de usuario (ej. Melendi, Sesa)">
         <button onclick="searchUserBalance()">Buscar Usuario</button>
       </div>
 
@@ -215,7 +215,7 @@
           <div class="user-actions">
             <input type="number" id="action-amount" placeholder="Monto VES">
             <button onclick="modifyUserBalance('add')" style="background: #22c55e; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer;">+ Sumar (Depósito)</button>
-            <button onclick="modifyUserBalance('subtract')" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer;">- Restar (Retiro)</button>
+            <button onclick="modifyUserBalance('subtract')" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer;">Restar (Retiro)</button>
           </div>
         </div>
       </div>
@@ -290,6 +290,48 @@
     }
 
     async function loadData() {
+      // 0. Cargar todos los perfiles de la base de datos
+      const { data: profiles }  = await supabaseClient.from('profiles').select('*');
+
+      // Creamos un diccionario inteligente basado en todas las propiedades posibles del perfil
+      let userMap = {};
+      if (profiles && profiles.length > 0) {
+        profiles.forEach(p => {
+          const uName = p.username || p.name;
+          if (!uName) return;
+
+          if (p.id) userMap[String(p.id).trim().toLowerCase()] = uName;
+          if (p.email) userMap[String(p.email).trim().toLowerCase()] = uName;
+          if (p.username) userMap[String(p.username).trim().toLowerCase()] = uName;
+          if (p.name) userMap[String(p.name).trim().toLowerCase()] = uName;
+        });
+      }
+
+      // Función ultra segura que busca el username real en el diccionario o extrae el nombre limpio del correo
+      function getProfileUsername(rawUserId) {
+        if (!rawUserId) return 'Desconocido';
+        const searchVal = String(rawUserId).trim().toLowerCase();
+
+        // 1. Buscar coincidencia exacta en el diccionario de perfiles
+        if (userMap[searchVal]) {
+          return userMap[searchVal];
+        }
+
+        // 2. Si no lo halla exacto pero es un correo, buscar si alguna clave del diccionario contiene esa parte o viceversa
+        if (searchVal.includes('@')) {
+          const emailPrefix = searchVal.split('@')[0];
+          for (let key in userMap) {
+            if (key.includes(emailPrefix) || emailPrefix.includes(key)) {
+              return userMap[key];
+            }
+          }
+          // Si de plano no está en profiles, devolver al menos la primera parte del correo con mayúscula inicial bonita
+          return emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
+        }
+
+        return rawUserId;
+      }
+
       // 1. Cargar Depósitos
       const { data: deposits } = await supabaseClient
         .from('deposits')
@@ -302,10 +344,11 @@
       if (deposits && deposits.length > 0) {
         depBody.innerHTML = deposits.map(d => {
           if (d.status === 'Aprobado') totalDeposited += Number(d.amount);
+          const userNameDisplay = getProfileUsername(d.user_id);
           return `
             <tr>
               <td>${new Date(d.created_at).toLocaleString()}</td>
-              <td><strong>${d.user_id}</strong></td>
+              <td><strong>${userNameDisplay}</strong></td>
               <td>${d.method}</td>
               <td style="color: #22c55e; font-weight: bold;">+${Number(d.amount).toLocaleString('es-VE')} VES</td>
               <td><code>${d.reference}</code></td>
@@ -335,10 +378,11 @@
       if (withdrawals && withdrawals.length > 0) {
         withBody.innerHTML = withdrawals.map(w => {
           if (w.status === 'Aprobado') totalWithdrawn += Number(w.amount);
+          const userNameDisplay = getProfileUsername(w.user_id);
           return `
             <tr>
               <td>${new Date(w.created_at).toLocaleString()}</td>
-              <td><strong>${w.user_id}</strong></td>
+              <td><strong>${userNameDisplay}</strong></td>
               <td>${w.method}</td>
               <td style="color: #ef4444; font-weight: bold;">-${Number(w.amount).toLocaleString('es-VE')} VES</td>
               <td><code>${w.account_details || w.account_info || 'N/A'}</code></td>
@@ -363,35 +407,38 @@
       document.getElementById('metric-moving-balance').innerText = `${movingBalance.toLocaleString('es-VE')} VES`;
     }
 
-    // BUSCAR USUARIO Y SU SALDO DIRECTAMENTE
+    // BUSCAR USUARIO Y SALDO DIRECTAMENTE
     async function searchUserBalance() {
       const query = document.getElementById('search-user-input').value.trim();
       if (!query) {
-        alert("Por favor escribe un correo o nombre de usuario.");
+        alert("Por favor escribe un nombre de usuario.");
         return;
       }
 
-      let profileData = null;
+      const { data: byUser } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .ilike('username', `%${query}%`)
+        .maybeSingle();
 
-      // Buscar por username o por si coincide en la tabla profiles
-      const { data: byUser } = await supabaseClient.from('profiles').select('*').eq('username', query).maybeSingle();
-      if (byUser) {
-        profileData = byUser;
-      } else {
-        // Si no, tomar el primer perfil disponible (ya que manejas tu cuenta principal)
-        const { data: allProfiles } = await supabaseClient.from('profiles').select('*').limit(1);
-        if (allProfiles && allProfiles.length > 0) {
-          profileData = allProfiles[0];
-        }
+      let profileData = byUser;
+
+      if (!profileData) {
+        const { data: byName } = await supabaseClient
+          .from('profiles')
+          .select('*')
+          .ilike('name', `%${query}%`)
+          .maybeSingle();
+        profileData = byName;
       }
 
       if (profileData) {
         currentFoundUser = profileData;
-        document.getElementById('res-username').innerText = query;
+        document.getElementById('res-username').innerText = profileData.username || profileData.name || query;
         document.getElementById('res-balance').innerText = Number(profileData.balance || 0).toLocaleString('es-VE');
         document.getElementById('user-result-container').style.display = 'block';
       } else {
-        alert("No se encontró ningún usuario con ese dato.");
+        alert("No se encontró ningún usuario con ese nombre.");
         document.getElementById('user-result-container').style.display = 'none';
       }
     }
@@ -408,20 +455,20 @@
 
       const currentBalance = Number(currentFoundUser.balance || 0);
       let newBalance = currentBalance;
+      const targetName = currentFoundUser.username || currentFoundUser.name || 'usuario';
 
       if (type === 'add') {
-        if (!confirm(`¿Sumar ${amountInput} VES al saldo de ${currentFoundUser.username || 'usuario'}?`)) return;
+        if (!confirm(`¿Sumar ${amountInput} VES al saldo de ${targetName}?`)) return;
         newBalance = currentBalance + amountInput;
       } else {
         if (currentBalance < amountInput) {
           alert(`El usuario solo tiene ${currentBalance} VES disponibles. No se puede descontar esa cantidad.`);
           return;
         }
-        if (!confirm(`¿Descontar ${amountInput} VES del saldo de ${currentFoundUser.username || 'usuario'}?`)) return;
+        if (!confirm(`¿Descontar ${amountInput} VES del saldo de ${targetName}?`)) return;
         newBalance = currentBalance - amountInput;
       }
 
-      // Actualizar en Supabase en la tabla profiles
       const { error } = await supabaseClient
         .from('profiles')
         .update({ balance: newBalance })
@@ -434,12 +481,13 @@
         currentFoundUser.balance = newBalance;
         document.getElementById('res-balance').innerText = newBalance.toLocaleString('es-VE');
         document.getElementById('action-amount').value = '';
+        loadData();
       }
     }
 
     // APROBAR DEPÓSITO
     async function processDeposit(depositId, userId, amount) {
-      if (!confirm(`¿Confirmar aprobación del depósito de ${amount} VES para ${userId}?`)) return;
+      if (!confirm(`¿Confirmar aprobación del depósito de ${amount} VES?`)) return;
 
       const { error } = await supabaseClient
         .from('deposits')
@@ -456,7 +504,7 @@
 
     // APROBAR RETIRO
     async function processWithdrawal(withdrawalId, userId, amount) {
-      if (!confirm(`¿Confirmar aprobación del retiro de ${amount} VES para ${userId}?`)) return;
+      if (!confirm(`¿Confirmar aprobación del retiro de ${amount} VES?`)) return;
 
       const { error } = await supabaseClient
         .from('withdrawals')
