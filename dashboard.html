@@ -716,7 +716,6 @@
       { id: 'emerald', name: 'Escamas Esmeralda', style: 'linear-gradient(90deg, #0ba360 0%, #3cba92 100%)' }
     ];
 
-    // Generar dinámicamente hasta 100 diseños de gusanos
     for (let i = 10; i <= 100; i++) {
       const hue = (i * 137.5) % 360;
       SKINS_LIST.push({
@@ -750,7 +749,6 @@
       renderSkins();
     }
 
-    // Sistema de Pestañas
     function switchTab(tabId, event) {
       document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
@@ -767,13 +765,11 @@
       }
     }
 
-    // Obtener identificador del usuario actual
     function getUserIdentifier() {
       let userIdentifier = localStorage.getItem('user_email') || localStorage.getItem('user_id');
       return userIdentifier || "Usuario Sin Sesión";
     }
 
-    // Cambiar método de depósito desde Supabase
     async function selectPaymentMethod(method) {
       selectedPaymentMethod = method;
       ['pago_movil', 'transferencia', 'pago_ubii'].forEach(m => {
@@ -829,7 +825,6 @@
       }
     }
 
-    // Guardar datos bancarios del usuario
     async function saveBankAccount() {
       const bankName = document.getElementById('bank-name').value.trim();
       const phone = document.getElementById('bank-phone').value.trim();
@@ -869,7 +864,6 @@
       }
     }
 
-    // Cargar cuenta bancaria guardada
     async function loadUserBankAccount() {
       const userIdentifier = getUserIdentifier();
       const selectElement = document.getElementById('saved-accounts-select');
@@ -897,7 +891,6 @@
       }
     }
 
-    // Registrar depósito
     async function submitDeposit() {
       const amountInput = document.getElementById('deposit-amount').value;
       const referenceInput = document.getElementById('deposit-reference').value.trim();
@@ -933,7 +926,6 @@
       }
     }
 
-    // Solicitar retiro
     async function submitWithdrawal() {
       const amountInput = document.getElementById('withdraw-amount').value;
       const selectElement = document.getElementById('saved-accounts-select').value;
@@ -950,13 +942,12 @@
       }
 
       const userIdentifier = getUserIdentifier();
-
+      
       const { error } = await supabaseClient.from('withdrawals').insert([
         {
           user_id: userIdentifier,
-          method: 'Pago Móvil',
           amount: amount,
-          account_details: selectElement,
+          bank_details: selectElement,
           status: 'Pendiente'
         }
       ]);
@@ -969,72 +960,21 @@
       }
     }
 
-    // ENTRAR A LA SALA: Descuenta saldo en Supabase de forma segura y arranca la partida
-    async function selectRoom(entryFee) {
-      if (!confirm(`¿Deseas entrar a la sala por ${entryFee} VES? Se descontará de tu saldo disponible.`)) return;
-
-      const { data: { user } } = await supabaseClient.auth.getUser();
-      let profile = null;
-
-      if (user) {
-        const { data } = await supabaseClient
-          .from('profiles')
-          .select('id, balance')
-          .eq('id', user.id)
-          .maybeSingle();
-        profile = data;
-      }
-
-      if (!profile) {
-        const { data: allProfiles } = await supabaseClient
-          .from('profiles')
-          .select('id, balance')
-          .limit(1);
-        if (allProfiles && allProfiles.length > 0) {
-          profile = allProfiles[0];
-        }
-      }
-
-      if (!profile) {
-        alert("No se encontró tu perfil en la base de datos. Por favor vuelve a iniciar sesión.");
-        return;
-      }
-
-      const currentBalance = Number(profile.balance || 0);
-
-      if (currentBalance < entryFee) {
-        alert(`Saldo insuficiente. Tienes ${currentBalance} VES y necesitas ${entryFee} VES para entrar a esta sala.`);
-        return;
-      }
-
-      const newBalance = currentBalance - entryFee;
-
-      const { error: updateError } = await supabaseClient
-        .from('profiles')
-        .update({ balance: newBalance })
-        .eq('id', profile.id);
-
-      if (updateError) {
-        alert("Error al procesar el pago de entrada: " + updateError.message);
-        return;
-      }
-
+    function selectRoom(entryFee) {
       localStorage.setItem('selected_entry', entryFee);
-      alert(`¡Entrada pagada con éxito! Saldo restante: ${newBalance} VES. ¡A jugar!`);
       window.location.href = 'game.html';
     }
 
-    async function logout() {
-      await supabaseClient.auth.signOut();
+    function logout() {
       localStorage.clear();
       window.location.href = 'index.html';
     }
 
-    // Inicializar al cargar
-    loadUserData();
-    renderSkins();
-    selectPaymentMethod('pago_movil');
-    loadUserBankAccount();
+    window.onload = () => {
+      loadUserData();
+      renderSkins();
+      selectPaymentMethod('pago_movil');
+    };
   </script>
 </body>
 </html>
