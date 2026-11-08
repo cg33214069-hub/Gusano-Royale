@@ -104,11 +104,14 @@
 </div>
 
 <script>
-  // Bandera de optimización para congelar cálculos pesados durante los 10 segundos iniciales
+  // Inicialización del cliente Supabase
+  const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
   window.isPreparingTimerActive = true;
   setTimeout(() => { window.isPreparingTimerActive = false; }, 10000);
 
-  // FUNCIÓN PARA ABANDONAR PARTIDA DE FORMA SEGURA
   function abandonarPartida() {
     if (confirm("¿Estás seguro de abandonar la partida? Perderás el dinero de la entrada.")) {
       localStorage.removeItem('selected_entry');
@@ -116,58 +119,52 @@
     }
   }
 
-  // FUNCIÓN DE RESPALDO PARA SUMAR GANANCIAS EN SUPABASE
+  // FUNCIÓN OPTIMIZADA PARA SUMAR GANANCIAS EN SUPABASE
   async function finishGameAndReward(amountWon) {
-    if (typeof supabase === 'undefined') {
-      console.error("supabase no está definido en el script principal.");
+    const userId = localStorage.getItem('user_id');
+    const userEmail = localStorage.getItem('user_email');
+    
+    if (!userId && !userEmail) {
+      alert("Sesión no válida para acreditar el premio.");
+      window.location.href = 'dashboard.html';
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    let profile = null;
-
-    if (user) {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, balance')
-        .eq('id', user.id)
-        .maybeSingle();
-      profile = data;
+    // 1. Obtener balance actual del perfil por id o email
+    let query = supabaseClient.from('profiles').select('id, balance');
+    if (userId) {
+      query = query.eq('id', userId);
+    } else {
+      query = query.eq('email', userEmail);
     }
 
-    if (!profile) {
-      const { data: allProfiles } = await supabase
-        .from('profiles')
-        .select('id, balance')
-        .limit(1);
-      if (allProfiles && allProfiles.length > 0) {
-        profile = allProfiles[0];
-      }
-    }
+    const { data: profile, error: errFetch } = await query.maybeSingle();
 
-    if (!profile) {
-      alert("Error al encontrar perfil para acreditar premio.");
+    if (errFetch || !profile) {
+      console.error("Error cargando perfil:", errFetch);
+      alert("No se pudo obtener tu perfil para sumar las ganancias.");
       return;
     }
 
     const currentBalance = Number(profile.balance || 0);
     const newBalance = currentBalance + Number(amountWon);
 
-    const { error } = await supabase
+    // 2. Actualizar el saldo una sola vez
+    const { error: errUpdate } = await supabaseClient
       .from('profiles')
       .update({ balance: newBalance })
       .eq('id', profile.id);
 
-    if (error) {
-      alert("Error al guardar ganancias en Supabase: " + error.message);
+    if (errUpdate) {
+      alert("Error guardando el saldo en Supabase: " + errUpdate.message);
     } else {
-      document.getElementById('end-ves-amount').innerText = `${amountWon.toLocaleString('es-VE')} VES`;
+      document.getElementById('end-ves-amount').innerText = `${Number(amountWon).toLocaleString('es-VE')} VES`;
       document.getElementById('end-modal').style.display = 'flex';
     }
   }
 </script>
 
-<!-- 2. ENLAZAMOS LA LÓGICA DEL JUEGO AL FINAL -->
+<!-- 2. ENLAZAMOS LA LÓGICA DEL JUEGO -->
 <script src="script.js"></script>
 </body>
 </html>
