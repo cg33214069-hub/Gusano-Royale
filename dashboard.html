@@ -381,17 +381,6 @@
       line-height: 1.6;
     }
 
-    /* ESTILO PARA LOS DATOS BANCARIOS CON BOTÓN DE COPIAR */
-    .copy-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #030712;
-      padding: 10px 14px;
-      border-radius: 8px;
-      border: 1px solid rgba(255,255,255,0.05);
-      margin-bottom: 8px;
-    }
     .copy-btn {
       background: #38bdf8;
       color: #000;
@@ -832,7 +821,6 @@
       if (error || !data) {
         infoBox.innerHTML = "No hay información configurada para este método en Supabase.";
       } else {
-        // Envolvemos el contenido de Supabase y agregamos botones de copia inteligentes si se desea
         infoBox.innerHTML = `
           <div style="margin-bottom: 12px; white-space: pre-line;">${data.content}</div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
@@ -868,6 +856,22 @@
         }
       } catch (e) {
         console.log("Modo local");
+      }
+    }
+
+    // Seleccionar Sala de Juego
+    function selectRoom(montoEntrada) {
+      const navBalanceText = document.getElementById('nav-balance').innerText;
+      const saldoActual = parseFloat(navBalanceText.replace(/[^0-9,-]/g, '').replace(',', '.'));
+
+      if (isNaN(saldoActual) || saldoActual < montoEntrada) {
+        alert(`Saldo insuficiente. Necesitas al menos ${montoEntrada} VES para entrar a esta sala.`);
+        return;
+      }
+
+      const confirmar = confirm(`¿Deseas ingresar a la sala de ${montoEntrada} VES?`);
+      if (confirmar) {
+        window.location.href = `index.html?room=${montoEntrada}`;
       }
     }
 
