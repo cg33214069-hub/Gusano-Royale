@@ -1,5 +1,5 @@
 // ==========================================
-// 1. CONFIGURACIÓN MULTIJUGADOR REAL
+// 1. CONFIGURACIÓN MULTIJUGADOR REAL CON BOTÍN COMPARTIDO
 // ==========================================
 const WORLD_SIZE = 3000;
 const PREPARATION_TIME = 10; 
@@ -59,17 +59,16 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let supabaseClient = null;
 let gameRoom = null;
 const myPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
-let remotePlayers = {}; // Aquí se guardan tus amigos conectados en vivo
+let remotePlayers = {}; 
+let sharedLootOrbs = []; // Esferas de botín compartidas en tiempo real
 
 if (window.supabase) {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   
-  // Suscribirse a la sala pública 'arena_principal'
   gameRoom = supabaseClient.channel('arena_principal', {
     config: { broadcast: { self: false } }
   });
 
-  // Escuchar cuando un amigo transmite su posición
   gameRoom.on('broadcast', { event: 'player_move' }, ({ payload }) => {
     if (payload.id !== myPlayerId) {
       remotePlayers[payload.id] = payload;
@@ -77,16 +76,27 @@ if (window.supabase) {
     }
   });
 
-  // Escuchar cuando alguien es eliminado
   gameRoom.on('broadcast', { event: 'player_died' }, ({ payload }) => {
     if (remotePlayers[payload.id]) {
       delete remotePlayers[payload.id];
     }
   });
 
+  // Sincronizar aparición de botín por red
+  gameRoom.on('broadcast', { event: 'spawn_loot' }, ({ payload }) => {
+    sharedLootOrbs.push(payload);
+  });
+
+  // Sincronizar recolección de botín por red
+  gameRoom.on('broadcast', { event: 'collect_loot' }, ({ payload }) => {
+    if (sharedLootOrbs[payload.index]) {
+      sharedLootOrbs.splice(payload.index, 1);
+    }
+  });
+
   gameRoom.subscribe((status) => {
     if (status === 'SUBSCRIBED') {
-      console.log("¡Conectado a la arena multijugador con tus amigos!");
+      console.log("¡Conectado a la arena multijugador con botín sincronizado!");
     }
   });
 }
@@ -113,8 +123,38 @@ for (let i = 0; i < player.length; i++) {
   player.body.push({ x: player.x, y: player.y });
 }
 
+function dropLootOnDeath(x, y, totalVes) {
+  const drops = 12;
+  const valuePerDrop = Math.floor(totalVes / drops);
+
+  for (let i = 0; i < drops; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * 50;
+    const lootItem = {
+      x: x + Math.cos(angle) * dist,
+      y: y + Math.sin(angle) * dist,
+      ves: valuePerDrop,
+      radius: Math.max(5, Math.min(12, Math.sqrt(valuePerDrop) * 1.2)),
+      color: valuePerDrop > 200 ? '#4ade80' : '#38bdf8'
+    };
+
+    sharedLootOrbs.push(lootItem);
+
+    if (gameRoom) {
+      gameRoom.send({
+        type: 'broadcast',
+        event: 'spawn_loot',
+        payload: lootItem
+      });
+    }
+  }
+}
+
 function updateLocalPlayer() {
   if (!player.alive) return;
+
+  player.radius = 10 + Math.min(20, Math.sqrt(player.ves) * 0.25);
+  player.length = Math.floor(15 + player.ves / (selectedEntryFee / 20));
 
   let currentSpeed = player.speed;
   if (isBoosting && player.ves > (selectedEntryFee * 0.1)) {
@@ -141,7 +181,29 @@ function updateLocalPlayer() {
     player.body.pop();
   }
 
-  // Enviar nuestra posición a todos los amigos conectados en el canal
+  // Recoger esferas de botín en el mapa
+  for (let i = sharedLootOrbs.length - 1; i >= 0; i--) {
+    const orb = sharedLootOrbs[i];
+    const dx = player.x - orb.x;
+    const dy = player.y - orb.y;
+    if (Math.abs(dx) < 30 && Math.abs(dy) < 30) {
+      if (Math.hypot(dx, dy) < player.radius + orb.radius + 8) {
+        player.ves += orb.ves;
+        sharedLootOrbs.splice(i, 1);
+
+        // Avisar a los demás que esta esfera fue recogida
+        if (gameRoom) {
+          gameRoom.send({
+            type: 'broadcast',
+            event: 'collect_loot',
+            payload: { index: i }
+          });
+        }
+      }
+    }
+  }
+
+  // Enviar nuestra posición a la red
   if (gameRoom && gameActive) {
     gameRoom.send({
       type: 'broadcast',
@@ -154,7 +216,7 @@ function updateLocalPlayer() {
         angle: player.angle,
         ves: player.ves,
         skinId: player.skinId,
-        body: player.body.slice(0, 15) // Enviamos una muestra liviana del cuerpo
+        body: player.body.slice(0, 15)
       }
     });
   }
@@ -201,7 +263,6 @@ function drawPlayer(p, camera, isLocal = false) {
 function checkRealPlayerCollisions() {
   if (currentPhase !== 'COMBAT' || !player.alive) return;
 
-  // Limpiar jugadores desconectados (más de 3 segundos sin responder)
   const now = Date.now();
   Object.keys(remotePlayers).forEach(id => {
     if (now - remotePlayers[id].lastUpdate > 3000) {
@@ -209,13 +270,16 @@ function checkRealPlayerCollisions() {
     }
   });
 
-  // Revisar si la cabeza del jugador local choca contra el cuerpo de un amigo
   Object.values(remotePlayers).forEach(friend => {
     if (!friend.body) return;
     for (let seg of friend.body) {
       if (Math.abs(player.x - seg.x) < 20 && Math.abs(player.y - seg.y) < 20) {
         if (Math.hypot(player.x - seg.x, player.y - seg.y) < 14) {
           player.alive = false;
+          
+          // Soltar botín al morir
+          dropLootOnDeath(player.x, player.y, player.ves);
+
           if (gameRoom) {
             gameRoom.send({ type: 'broadcast', event: 'player_died', payload: { id: player.id } });
           }
@@ -268,7 +332,6 @@ function gameLoop() {
 
     const camera = { x: player.x - canvas.width / 2, y: player.y - canvas.height / 2 };
 
-    // Grilla de fondo
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
     ctx.lineWidth = 1;
     for (let x = -camera.x % 120; x < canvas.width; x += 120) {
@@ -278,10 +341,19 @@ function gameLoop() {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
     }
 
-    // Dibujar a los amigos conectados
-    Object.values(remotePlayers).forEach(friend => drawPlayer(friend, camera, false));
+    // Dibujar las esferas de botín compartidas en el mapa
+    sharedLootOrbs.forEach(orb => {
+      const sx = orb.x - camera.x;
+      const sy = orb.y - camera.y;
+      if (sx >= -20 && sx <= canvas.width + 20 && sy >= -20 && sy <= canvas.height + 20) {
+        ctx.beginPath();
+        ctx.arc(sx, sy, orb.radius, 0, Math.PI * 2);
+        ctx.fillStyle = orb.color;
+        ctx.fill();
+      }
+    });
 
-    // Dibujar jugador local
+    Object.values(remotePlayers).forEach(friend => drawPlayer(friend, camera, false));
     drawPlayer(player, camera, true);
 
     updateHUD();
