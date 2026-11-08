@@ -51,20 +51,15 @@ if (boostBtn) {
 }
 
 // ==========================================
-// 2. CONEXIÓN A SUPABASE REALTIME
+// 2. CONEXIÓN A SUPABASE REALTIME (Usando el cliente global de game.html)
 // ==========================================
-const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
-
-let supabaseClient = null;
 let gameRoom = null;
 const myPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
 let remotePlayers = {}; 
 let sharedLootOrbs = []; // Esferas de botín compartidas en tiempo real
 
-if (window.supabase) {
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  
+// Verificamos que el cliente de Supabase esté disponible
+if (typeof supabaseClient !== 'undefined' && supabaseClient) {
   gameRoom = supabaseClient.channel('arena_principal', {
     config: { broadcast: { self: false } }
   });
@@ -378,6 +373,11 @@ function endGame(survived, reason) {
   if (endModal) endModal.style.display = 'flex';
 
   const finalAmount = survived ? Math.floor(player.ves) : 0;
+
+  // Llamamos a la función de recompensa en game.html para sumar los VES a Supabase
+  if (survived && typeof finishGameAndReward === 'function') {
+    finishGameAndReward(finalAmount);
+  }
 
   if (survived) {
     if (endTitle) { endTitle.innerText = "¡VICTORIA REAL!"; endTitle.style.color = "#4ade80"; }
