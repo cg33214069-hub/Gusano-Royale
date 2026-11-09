@@ -171,6 +171,101 @@
     }
     .btn-approve:hover { background: #16a34a; }
     .btn-reject:hover { background: #dc2626; }
+
+    /* ESTILOS DE LOS MODALES */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(4px);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    .modal-card {
+      background: #0b0f19;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 16px;
+      padding: 24px;
+      width: 90%;
+      max-width: 480px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .modal-header {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #38bdf8;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-body-box {
+      background: #030712;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .modal-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 0.9rem;
+    }
+    .modal-row.highlight {
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding-top: 10px;
+      margin-top: 10px;
+      font-weight: bold;
+      font-size: 1rem;
+    }
+    .modal-field {
+      margin-bottom: 14px;
+    }
+    .modal-field label {
+      display: block;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .modal-field input {
+      width: 100%;
+      background: #030712;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 10px;
+      color: #fff;
+      font-size: 0.95rem;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .btn-confirm-pay {
+      flex: 1;
+      background: #22c55e;
+      color: #000;
+      font-weight: bold;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-confirm-pay:hover { background: #16a34a; color: #fff; }
+    .btn-cancel-modal {
+      background: #334155;
+      color: #fff;
+      border: none;
+      padding: 12px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -201,7 +296,7 @@
     <div class="search-box-card">
       <h2 style="font-size: 1rem; color: #38bdf8; text-transform: uppercase;">🔍 Búsqueda y Gestión Rápida de Saldo de Usuario</h2>
       <div class="search-input-group">
-        <input type="text" id="search-user-input" placeholder="Ingresa el nombre de usuario (ej. Melendi, Sesa)">
+        <input type="text" id="search-user-input" placeholder="Ingresa nombre, usuario o correo (ej. melendi@...)">
         <button onclick="searchUserBalance()">Buscar Usuario</button>
       </div>
 
@@ -269,12 +364,107 @@
     </div>
   </div>
 
+  <!-- MODAL DE APROBACIÓN DE DEPÓSITO Y FACTURA -->
+  <div id="modal-deposit-overlay" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span>🧾 Aprobar Depósito y Factura</span>
+        <span onclick="closeDepositModal()" style="cursor: pointer; color: #64748b;">✕</span>
+      </div>
+
+      <div class="modal-body-box">
+        <div class="modal-row">
+          <span style="color: #64748b;">Usuario:</span>
+          <span id="modal-dep-user" style="color: #fff; font-weight: bold;">-</span>
+        </div>
+        <div class="modal-row">
+          <span style="color: #64748b;">Método:</span>
+          <span id="modal-dep-method" style="color: #38bdf8;">-</span>
+        </div>
+        <div class="modal-row">
+          <span style="color: #64748b;">Referencia:</span>
+          <span id="modal-dep-ref" style="color: #fff;">-</span>
+        </div>
+        <div class="modal-row highlight">
+          <span>Monto Acreditado:</span>
+          <span id="modal-dep-amount" style="color: #22c55e;">0 VES</span>
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <label for="input-dep-phone">Teléfono del Jugador (para WhatsApp)</label>
+        <input type="text" id="input-dep-phone" placeholder="Ej. 584121234567" autocomplete="off">
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-confirm-pay" onclick="confirmDepositAndSendInvoice()">Aprobar y Enviar Factura</button>
+        <button class="btn-cancel-modal" onclick="closeDepositModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE APROBACIÓN DE RETIRO Y FACTURACIÓN AUTOMÁTICA -->
+  <div id="modal-withdrawal-overlay" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span>🧾 Procesar Retiro y Factura</span>
+        <span onclick="closeWithdrawalModal()" style="cursor: pointer; color: #64748b;">✕</span>
+      </div>
+
+      <div class="modal-body-box">
+        <div class="modal-row">
+          <span style="color: #64748b;">Usuario:</span>
+          <span id="modal-user-display" style="color: #fff; font-weight: bold;">-</span>
+        </div>
+        <div class="modal-row">
+          <span style="color: #64748b;">Datos Pago Móvil:</span>
+          <span id="modal-account-display" style="color: #38bdf8;">-</span>
+        </div>
+        <div class="modal-row">
+          <span style="color: #64748b;">Monto Solicitado:</span>
+          <span id="modal-requested-amount" style="color: #fff;">0 VES</span>
+        </div>
+        <div class="modal-row">
+          <span style="color: #64748b;">Comisión Plataforma (<span id="modal-fee-percent">0</span>%):</span>
+          <span id="modal-fee-amount" style="color: #ef4444;">0 VES</span>
+        </div>
+        <div class="modal-row highlight">
+          <span>Monto a Depositar:</span>
+          <span id="modal-net-amount" style="color: #22c55e;">0 VES</span>
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <label for="input-commission-rate">Porcentaje de Comisión / IVA (%)</label>
+        <input type="number" id="input-commission-rate" value="0" min="0" max="100" oninput="recalculateWithdrawalModal()">
+      </div>
+
+      <div class="modal-field">
+        <label for="input-bank-reference">Número de Referencia Bancaria (Pago Móvil)</label>
+        <input type="text" id="input-bank-reference" placeholder="Ej. 000123456789" autocomplete="off">
+      </div>
+
+      <div class="modal-field">
+        <label for="input-user-phone">Teléfono del Jugador (para WhatsApp)</label>
+        <input type="text" id="input-user-phone" placeholder="Ej. 584121234567" autocomplete="off">
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-confirm-pay" onclick="confirmWithdrawalAndSendInvoice()">Aprobar y Enviar Factura</button>
+        <button class="btn-cancel-modal" onclick="closeWithdrawalModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
     
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let currentFoundUser = null;
+    let globalUserMap = {}; 
+    let activeWithdrawal = null; 
+    let activeDeposit = null; 
 
     function switchTab(type, btnElement) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -290,46 +480,36 @@
     }
 
     async function loadData() {
-      // 0. Cargar todos los perfiles de la base de datos
-      const { data: profiles }  = await supabaseClient.from('profiles').select('*');
+      const { data: profiles } = await supabaseClient.from('profiles').select('*');
 
-      // Creamos un diccionario inteligente basado en todas las propiedades posibles del perfil
-      let userMap = {};
+      globalUserMap = {};
       if (profiles && profiles.length > 0) {
         profiles.forEach(p => {
-          const uName = p.username || p.name;
-          if (!uName) return;
-
-          if (p.id) userMap[String(p.id).trim().toLowerCase()] = uName;
-          if (p.email) userMap[String(p.email).trim().toLowerCase()] = uName;
-          if (p.username) userMap[String(p.username).trim().toLowerCase()] = uName;
-          if (p.name) userMap[String(p.name).trim().toLowerCase()] = uName;
+          const displayName = p.username || p.name || (p.email ? p.email.split('@')[0] : 'Usuario');
+          
+          if (p.id) globalUserMap[String(p.id).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: p.balance || 0 };
+          if (p.email) globalUserMap[String(p.email).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: p.balance || 0 };
+          if (p.username) globalUserMap[String(p.username).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: p.balance || 0 };
+          if (p.name) globalUserMap[String(p.name).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: p.balance || 0 };
         });
       }
 
-      // Función ultra segura que busca el username real en el diccionario o extrae el nombre limpio del correo
-      function getProfileUsername(rawUserId) {
-        if (!rawUserId) return 'Desconocido';
+      function getProfileData(rawUserId) {
+        if (!rawUserId) return { name: 'Desconocido', phone: '' };
         const searchVal = String(rawUserId).trim().toLowerCase();
 
-        // 1. Buscar coincidencia exacta en el diccionario de perfiles
-        if (userMap[searchVal]) {
-          return userMap[searchVal];
+        if (globalUserMap[searchVal]) return globalUserMap[searchVal];
+
+        for (let key in globalUserMap) {
+          if (key.includes(searchVal) || searchVal.includes(key)) return globalUserMap[key];
         }
 
-        // 2. Si no lo halla exacto pero es un correo, buscar si alguna clave del diccionario contiene esa parte o viceversa
         if (searchVal.includes('@')) {
           const emailPrefix = searchVal.split('@')[0];
-          for (let key in userMap) {
-            if (key.includes(emailPrefix) || emailPrefix.includes(key)) {
-              return userMap[key];
-            }
-          }
-          // Si de plano no está en profiles, devolver al menos la primera parte del correo con mayúscula inicial bonita
-          return emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
+          return { name: emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1), phone: '' };
         }
 
-        return rawUserId;
+        return { name: rawUserId, phone: '' };
       }
 
       // 1. Cargar Depósitos
@@ -344,18 +524,21 @@
       if (deposits && deposits.length > 0) {
         depBody.innerHTML = deposits.map(d => {
           if (d.status === 'Aprobado') totalDeposited += Number(d.amount);
-          const userNameDisplay = getProfileUsername(d.user_id);
+          const userData = getProfileData(d.user_id);
+          const safeUser = userData.name.replace(/'/g, "\\'");
+          const userPhone = userData.phone || '';
+
           return `
             <tr>
               <td>${new Date(d.created_at).toLocaleString()}</td>
-              <td><strong>${userNameDisplay}</strong></td>
+              <td><strong>${userData.name}</strong></td>
               <td>${d.method}</td>
               <td style="color: #22c55e; font-weight: bold;">+${Number(d.amount).toLocaleString('es-VE')} VES</td>
               <td><code>${d.reference}</code></td>
               <td><span class="badge badge-${d.status}">${d.status}</span></td>
               <td>
                 ${d.status === 'Pendiente' ? `
-                  <button class="btn-approve" onclick="processDeposit('${d.id}', '${d.user_id}', ${d.amount})">Aprobar</button>
+                  <button class="btn-approve" onclick="openDepositModal('${d.id}', '${safeUser}', ${d.amount}, '${d.method}', '${d.reference}', '${userPhone}')">Aprobar</button>
                   <button class="btn-reject" onclick="rejectTransaction('deposits', '${d.id}')">Rechazar</button>
                 ` : '<span style="color:#64748b;">Procesado</span>'}
               </td>
@@ -378,18 +561,24 @@
       if (withdrawals && withdrawals.length > 0) {
         withBody.innerHTML = withdrawals.map(w => {
           if (w.status === 'Aprobado') totalWithdrawn += Number(w.amount);
-          const userNameDisplay = getProfileUsername(w.user_id);
+          const userData = getProfileData(w.user_id);
+          const accountInfo = w.account_details || w.account_info || 'N/A';
+          
+          const safeUser = userData.name.replace(/'/g, "\\'");
+          const safeAccount = accountInfo.replace(/'/g, "\\'");
+          const userPhone = userData.phone || '';
+
           return `
             <tr>
               <td>${new Date(w.created_at).toLocaleString()}</td>
-              <td><strong>${userNameDisplay}</strong></td>
+              <td><strong>${userData.name}</strong></td>
               <td>${w.method}</td>
               <td style="color: #ef4444; font-weight: bold;">-${Number(w.amount).toLocaleString('es-VE')} VES</td>
-              <td><code>${w.account_details || w.account_info || 'N/A'}</code></td>
+              <td><code>${accountInfo}</code></td>
               <td><span class="badge badge-${w.status}">${w.status}</span></td>
               <td>
                 ${w.status === 'Pendiente' ? `
-                  <button class="btn-approve" onclick="processWithdrawal('${w.id}', '${w.user_id}', ${w.amount})">Aprobar</button>
+                  <button class="btn-approve" onclick="openWithdrawalModal('${w.id}', '${safeUser}', ${w.amount}, '${safeAccount}', '${userPhone}')">Aprobar</button>
                   <button class="btn-reject" onclick="rejectTransaction('withdrawals', '${w.id}')">Rechazar</button>
                 ` : '<span style="color:#64748b;">Procesado</span>'}
               </td>
@@ -400,54 +589,55 @@
         withBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #64748b;">No hay solicitudes de retiro.</td></tr>`;
       }
 
-      // 3. Actualizar Métricas de Finanzas
       document.getElementById('metric-total-deposits').innerText = `${totalDeposited.toLocaleString('es-VE')} VES`;
       document.getElementById('metric-total-withdrawals').innerText = `${totalWithdrawn.toLocaleString('es-VE')} VES`;
       const movingBalance = totalDeposited - totalWithdrawn;
       document.getElementById('metric-moving-balance').innerText = `${movingBalance.toLocaleString('es-VE')} VES`;
     }
 
-    // BUSCAR USUARIO Y SALDO DIRECTAMENTE
+    // BUSCAR USUARIO Y SALDO
     async function searchUserBalance() {
       const query = document.getElementById('search-user-input').value.trim();
       if (!query) {
-        alert("Por favor escribe un nombre de usuario.");
+        alert("Por favor escribe un nombre de usuario o correo.");
         return;
       }
 
-      const { data: byUser } = await supabaseClient
-        .from('profiles')
-        .select('*')
-        .ilike('username', `%${query}%`)
-        .maybeSingle();
-
-      let profileData = byUser;
-
-      if (!profileData) {
-        const { data: byName } = await supabaseClient
-          .from('profiles')
-          .select('*')
-          .ilike('name', `%${query}%`)
-          .maybeSingle();
-        profileData = byName;
+      const { data: profiles, error } = await supabaseClient.from('profiles').select('*');
+      if (error || !profiles || profiles.length === 0) {
+        alert("Error al conectar con la base de datos de perfiles.");
+        return;
       }
+
+      const queryLower = query.toLowerCase();
+      const profileData = profiles.find(p => {
+        const uName = (p.username || '').toLowerCase();
+        const fName = (p.name || '').toLowerCase();
+        const mail = (p.email || '').toLowerCase();
+        return uName.includes(queryLower) || fName.includes(queryLower) || mail.includes(queryLower);
+      });
 
       if (profileData) {
         currentFoundUser = profileData;
-        document.getElementById('res-username').innerText = profileData.username || profileData.name || query;
+        const displayName = profileData.username || profileData.name || profileData.email || 'Usuario';
+        document.getElementById('res-username').innerText = displayName;
         document.getElementById('res-balance').innerText = Number(profileData.balance || 0).toLocaleString('es-VE');
         document.getElementById('user-result-container').style.display = 'block';
       } else {
-        alert("No se encontró ningún usuario con ese nombre.");
+        alert("No se encontró ningún usuario con ese criterio de búsqueda.");
         document.getElementById('user-result-container').style.display = 'none';
+        currentFoundUser = null;
       }
     }
 
     // SUMAR O RESTAR SALDO DIRECTAMENTE DESDE EL PANEL
     async function modifyUserBalance(type) {
-      if (!currentFoundUser) return;
-      const amountInput = Number(document.getElementById('action-amount').value);
+      if (!currentFoundUser) {
+        alert("Primero debes buscar y seleccionar un usuario.");
+        return;
+      }
 
+      const amountInput = Number(document.getElementById('action-amount').value);
       if (!amountInput || amountInput <= 0) {
         alert("Ingresa un monto válido.");
         return;
@@ -455,17 +645,17 @@
 
       const currentBalance = Number(currentFoundUser.balance || 0);
       let newBalance = currentBalance;
-      const targetName = currentFoundUser.username || currentFoundUser.name || 'usuario';
+      const targetName = currentFoundUser.username || currentFoundUser.name || currentFoundUser.email || 'usuario';
 
       if (type === 'add') {
-        if (!confirm(`¿Sumar ${amountInput} VES al saldo de ${targetName}?`)) return;
+        if (!confirm(`¿Sumar ${amountInput.toLocaleString('es-VE')} VES al saldo de ${targetName}?`)) return;
         newBalance = currentBalance + amountInput;
       } else {
         if (currentBalance < amountInput) {
-          alert(`El usuario solo tiene ${currentBalance} VES disponibles. No se puede descontar esa cantidad.`);
+          alert(`El usuario solo tiene ${currentBalance.toLocaleString('es-VE')} VES disponibles. No se puede descontar esa cantidad.`);
           return;
         }
-        if (!confirm(`¿Descontar ${amountInput} VES del saldo de ${targetName}?`)) return;
+        if (!confirm(`¿Descontar ${amountInput.toLocaleString('es-VE')} VES del saldo de ${targetName}?`)) return;
         newBalance = currentBalance - amountInput;
       }
 
@@ -485,38 +675,167 @@
       }
     }
 
-    // APROBAR DEPÓSITO
-    async function processDeposit(depositId, userId, amount) {
-      if (!confirm(`¿Confirmar aprobación del depósito de ${amount} VES?`)) return;
+    // MODAL Y ACCIONES DE DEPÓSITOS
+    function openDepositModal(id, username, amount, method, reference, phone) {
+      activeDeposit = { id, username, amount, method, reference };
+      
+      document.getElementById('modal-dep-user').innerText = `@${username}`;
+      document.getElementById('modal-dep-method').innerText = method;
+      document.getElementById('modal-dep-ref').innerText = reference;
+      document.getElementById('modal-dep-amount').innerText = `${Number(amount).toLocaleString('es-VE')} VES`;
+      document.getElementById('input-dep-phone').value = phone || '';
+
+      document.getElementById('modal-deposit-overlay').style.display = 'flex';
+    }
+
+    function closeDepositModal() {
+      document.getElementById('modal-deposit-overlay').style.display = 'none';
+      activeDeposit = null;
+    }
+
+    async function confirmDepositAndSendInvoice() {
+      if (!activeDeposit) return;
 
       const { error } = await supabaseClient
         .from('deposits')
         .update({ status: 'Aprobado' })
-        .eq('id', depositId);
+        .eq('id', activeDeposit.id);
 
       if (error) {
         alert("Error al aprobar depósito: " + error.message);
-      } else {
-        alert("¡Depósito marcado como Aprobado!");
-        loadData();
+        return;
       }
+
+      const todayDate = new Date().toLocaleDateString('es-VE');
+      const invoiceText = 
+`🧾 *COMPROBANTE DE DEPÓSITO - GUSANOS ROYALE* 🪱🔥
+
+¡Hola *@${activeDeposit.username}*! Tu depósito ha sido verificado y acreditado con éxito.
+
+━━━━━━━━━━━━━━━━━━
+👤 *Usuario:* @${activeDeposit.username}
+💳 *Método:* ${activeDeposit.method}
+💰 *Monto Acreditado:* *${Number(activeDeposit.amount).toLocaleString('es-VE')} VES*
+🔢 *Referencia:* *${activeDeposit.reference}*
+📅 *Fecha:* ${todayDate}
+━━━━━━━━━━━━━━━━━━
+
+¡Ya tienes tu saldo disponible para entrar a las arenas y ganar en Gusanos Royale! 🚀`;
+
+      const rawPhone = document.getElementById('input-dep-phone').value.trim();
+      let cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+      if (cleanPhone.startsWith('0')) {
+        cleanPhone = '58' + cleanPhone.substring(1);
+      } else if (!cleanPhone.startsWith('58') && cleanPhone.length === 10) {
+        cleanPhone = '58' + cleanPhone;
+      }
+
+      let whatsappUrl = `https://wa.me/?text=${encodeURIComponent(invoiceText)}`;
+      if (cleanPhone) {
+        whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(invoiceText)}`;
+      }
+
+      window.open(whatsappUrl, '_blank');
+
+      alert("¡Depósito aprobado y factura generada!");
+      closeDepositModal();
+      loadData();
     }
 
-    // APROBAR RETIRO
-    async function processWithdrawal(withdrawalId, userId, amount) {
-      if (!confirm(`¿Confirmar aprobación del retiro de ${amount} VES?`)) return;
+    // MODAL Y ACCIONES DE RETIROS
+    function openWithdrawalModal(id, username, amount, accountDetails, phone) {
+      activeWithdrawal = { id, username, amount, accountDetails };
+      
+      document.getElementById('modal-user-display').innerText = `@${username}`;
+      document.getElementById('modal-account-display').innerText = accountDetails;
+      document.getElementById('modal-requested-amount').innerText = `${Number(amount).toLocaleString('es-VE')} VES`;
+      
+      document.getElementById('input-commission-rate').value = 0;
+      document.getElementById('input-bank-reference').value = '';
+      document.getElementById('input-user-phone').value = phone || '';
+
+      recalculateWithdrawalModal();
+      document.getElementById('modal-withdrawal-overlay').style.display = 'flex';
+    }
+
+    function recalculateWithdrawalModal() {
+      if (!activeWithdrawal) return;
+
+      const requested = Number(activeWithdrawal.amount);
+      const rate = parseFloat(document.getElementById('input-commission-rate').value) || 0;
+      
+      const fee = (requested * rate) / 100;
+      const netToDeposit = requested - fee;
+
+      document.getElementById('modal-fee-percent').innerText = rate;
+      document.getElementById('modal-fee-amount').innerText = `${fee.toLocaleString('es-VE')} VES`;
+      document.getElementById('modal-net-amount').innerText = `${netToDeposit.toLocaleString('es-VE')} VES`;
+    }
+
+    function closeWithdrawalModal() {
+      document.getElementById('modal-withdrawal-overlay').style.display = 'none';
+      activeWithdrawal = null;
+    }
+
+    async function confirmWithdrawalAndSendInvoice() {
+      if (!activeWithdrawal) return;
+
+      const reference = document.getElementById('input-bank-reference').value.trim();
+      if (!reference) {
+        alert("Por favor ingresa el número de referencia bancaria.");
+        return;
+      }
+
+      const requested = Number(activeWithdrawal.amount);
+      const rate = parseFloat(document.getElementById('input-commission-rate').value) || 0;
+      const fee = (requested * rate) / 100;
+      const netToDeposit = requested - fee;
+      const todayDate = new Date().toLocaleDateString('es-VE');
 
       const { error } = await supabaseClient
         .from('withdrawals')
         .update({ status: 'Aprobado' })
-        .eq('id', withdrawalId);
+        .eq('id', activeWithdrawal.id);
 
       if (error) {
-        alert("Error al procesar retiro: " + error.message);
-      } else {
-        alert("¡Retiro marcado como Aprobado!");
-        loadData();
+        alert("Error al procesar el retiro: " + error.message);
+        return;
       }
+
+      const invoiceText = 
+`🧾 *COMPROBANTE DE RETIRO - GUSANOS ROYALE* 🪱🔥
+
+Hola *@${activeWithdrawal.username}*, tu solicitud de retiro ha sido procesada con éxito.
+
+━━━━━━━━━━━━━━━━━━
+👤 *Usuario:* @${activeWithdrawal.username}
+💰 *Monto Solicitado:* ${requested.toLocaleString('es-VE')} VES
+📉 *Comisión / Servicio (${rate}%):* ${fee.toLocaleString('es-VE')} VES
+✅ *Monto Depositado:* *${netToDeposit.toLocaleString('es-VE')} VES*
+🔢 *Referencia Bancaria:* *${reference}*
+📅 *Fecha:* ${todayDate}
+━━━━━━━━━━━━━━━━━━
+
+¡Gracias por jugar con nosotros! Revisa tu cuenta bancaria. 🚀`;
+
+      const rawPhone = document.getElementById('input-user-phone').value.trim();
+      let cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+      if (cleanPhone.startsWith('0')) {
+        cleanPhone = '58' + cleanPhone.substring(1);
+      } else if (!cleanPhone.startsWith('58') && cleanPhone.length === 10) {
+        cleanPhone = '58' + cleanPhone;
+      }
+
+      let whatsappUrl = `https://wa.me/?text=${encodeURIComponent(invoiceText)}`;
+      if (cleanPhone) {
+        whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(invoiceText)}`;
+      }
+
+      window.open(whatsappUrl, '_blank');
+
+      alert("¡Retiro aprobado con éxito y factura generada!");
+      closeWithdrawalModal();
+      loadData();
     }
 
     // RECHAZAR TRANSACCIÓN

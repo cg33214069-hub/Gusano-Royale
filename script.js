@@ -51,15 +51,18 @@ if (boostBtn) {
 }
 
 // ==========================================
-// 2. CONEXIÓN A SUPABASE REALTIME (Usando el cliente global de game.html)
+// 2. CONEXIÓN A SUPABASE REALTIME (AISLADO POR SALA / APUESTA)
 // ==========================================
 let gameRoom = null;
 const myPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
 let remotePlayers = {}; 
 let sharedLootOrbs = []; // Esferas de botín compartidas en tiempo real
 
+// Creamos un nombre de canal único basado en la tarifa de entrada elegida (ej: 'arena_ves_50', 'arena_ves_1000')
+const roomChannelName = `arena_ves_${selectedEntryFee}`;
+
 if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-  gameRoom = supabaseClient.channel('arena_principal', {
+  gameRoom = supabaseClient.channel(roomChannelName, {
     config: { broadcast: { self: false } }
   });
 
@@ -90,7 +93,7 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
 
   gameRoom.subscribe((status) => {
     if (status === 'SUBSCRIBED') {
-      console.log("¡Conectado a la arena multijugador con botín sincronizado!");
+      console.log(`¡Conectado a la sala aislada [${roomChannelName}] con botín sincronizado!`);
     }
   });
 }
