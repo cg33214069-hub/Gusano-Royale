@@ -3,18 +3,20 @@
 // ==========================================
 const WORLD_SIZE = 3000;
 const PREPARATION_TIME = 10; 
-const COMBAT_TIME = 60;      
+const COMBAT_TIME = 60;       
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const minimapCanvas = document.getElementById('minimap');
-const mCtx = minimapCanvas.getContext('2d');
+const mCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
-  minimapCanvas.width = 120;
-  minimapCanvas.height = 120;
+  if (minimapCanvas) {
+    minimapCanvas.width = 120;
+    minimapCanvas.height = 120;
+  }
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
@@ -42,6 +44,15 @@ window.addEventListener('touchmove', (e) => {
   }
 }, { passive: true });
 
+// Control de Turbo en PC (Barra Espaciadora)
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') isBoosting = true;
+});
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'Space') isBoosting = false;
+});
+
+// Control de Turbo táctil para Teléfono
 const boostBtn = document.getElementById('boost-btn');
 if (boostBtn) {
   boostBtn.addEventListener('mousedown', () => isBoosting = true);
@@ -68,7 +79,18 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
 
   gameRoom.on('broadcast', { event: 'player_move' }, ({ payload }) => {
     if (payload.id !== myPlayerId) {
-      remotePlayers[payload.id] = payload;
+      if (!remotePlayers[payload.id]) {
+        remotePlayers[payload.id] = payload;
+      } else {
+        let p = remotePlayers[payload.id];
+        // Guardamos los objetivos para suavizar el movimiento y evitar saltos
+        p.targetX = payload.x;
+        p.targetY = payload.y;
+        p.targetAngle = payload.angle;
+        p.ves = payload.ves;
+        p.skinId = payload.skinId;
+        p.body = payload.body;
+      }
       remotePlayers[payload.id].lastUpdate = Date.now();
     }
   });
@@ -157,6 +179,8 @@ function updateLocalPlayer() {
   player.length = Math.floor(15 + player.ves / (selectedEntryFee / 20));
 
   let currentSpeed = player.speed;
+
+  // Lógica del Turbo (Aumenta velocidad y consume un poco de VES si tiene más del 10% del costo inicial)
   if (isBoosting && player.ves > (selectedEntryFee * 0.1)) {
     currentSpeed = 6.0;
     player.ves -= (selectedEntryFee * 0.0005);
@@ -275,6 +299,12 @@ function checkRealPlayerCollisions() {
   });
 
   Object.values(remotePlayers).forEach(friend => {
+    // Suavizado fluido de jugadores remotos para evitar saltos
+    if (friend.targetX !== undefined && friend.targetY !== undefined) {
+      friend.x += (friend.targetX - friend.x) * 0.25;
+      friend.y += (friend.targetY - friend.y) * 0.25;
+    }
+
     if (!friend.body) return;
     for (let seg of friend.body) {
       if (Math.abs(player.x - seg.x) < 20 && Math.abs(player.y - seg.y) < 20) {
@@ -326,42 +356,53 @@ function startTimer() {
   }, 1000);
 }
 
-function gameLoop() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+// Bucle de juego controlado a 60 FPS estables para evitar saturación y bloqueos
+let lastTime = 0;
+const fpsInterval = 1000 / 60;
 
-  if (gameActive && player.alive) {
-    updateLocalPlayer();
-    checkRealPlayerCollisions();
-
-    const camera = { x: player.x - canvas.width / 2, y: player.y - canvas.height / 2 };
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
-    ctx.lineWidth = 1;
-    for (let x = -camera.x % 120; x < canvas.width; x += 120) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-    }
-    for (let y = -camera.y % 120; y < canvas.height; y += 120) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-    }
-
-    sharedLootOrbs.forEach(orb => {
-      const sx = orb.x - camera.x;
-      const sy = orb.y - camera.y;
-      if (sx >= -20 && sx <= canvas.width + 20 && sy >= -20 && sy <= canvas.height + 20) {
-        ctx.beginPath();
-        ctx.arc(sx, sy, orb.radius, 0, Math.PI * 2);
-        ctx.fillStyle = orb.color;
-        ctx.fill();
-      }
-    });
-
-    Object.values(remotePlayers).forEach(friend => drawPlayer(friend, camera, false));
-    drawPlayer(player, camera, true);
-
-    updateHUD();
-  }
-
+function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
+
+  if (!lastTime) lastTime = timestamp;
+  let elapsed = timestamp - lastTime;
+
+  if (elapsed >= fpsInterval) {
+    lastTime = timestamp - (elapsed % fpsInterval);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (gameActive && player.alive) {
+      updateLocalPlayer();
+      checkRealPlayerCollisions();
+
+      const camera = { x: player.x - canvas.width / 2, y: player.y - canvas.height / 2 };
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+      ctx.lineWidth = 1;
+      for (let x = -camera.x % 120; x < canvas.width; x += 120) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = -camera.y % 120; y < canvas.height; y += 120) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+
+      sharedLootOrbs.forEach(orb => {
+        const sx = orb.x - camera.x;
+        const sy = orb.y - camera.y;
+        if (sx >= -20 && sx <= canvas.width + 20 && sy >= -20 && sy <= canvas.height + 20) {
+          ctx.beginPath();
+          ctx.arc(sx, sy, orb.radius, 0, Math.PI * 2);
+          ctx.fillStyle = orb.color;
+          ctx.fill();
+        }
+      });
+
+      Object.values(remotePlayers).forEach(friend => drawPlayer(friend, camera, false));
+      drawPlayer(player, camera, true);
+
+      updateHUD();
+    }
+  }
 }
 
 gameActive = true;
