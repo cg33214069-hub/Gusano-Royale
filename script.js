@@ -80,25 +80,14 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
     if (payload.id !== myPlayerId) {
       if (!remotePlayers[payload.id]) {
         remotePlayers[payload.id] = payload;
-        remotePlayers[payload.id].vx = 0;
-        remotePlayers[payload.id].vy = 0;
       } else {
         let p = remotePlayers[payload.id];
-        
-        // Calculamos la velocidad estimada basada en el cambio de posición en el tiempo
-        const now = Date.now();
-        const dt = (now - (p.lastUpdate || now)) / 1000;
-        if (dt > 0) {
-          p.vx = (payload.x - p.x) / (dt * 10);
-          p.vy = (payload.y - p.y) / (dt * 10);
-        }
-
         p.targetX = payload.x;
         p.targetY = payload.y;
         p.targetAngle = payload.angle;
         p.ves = payload.ves;
         p.skinId = payload.skinId;
-        p.body = payload.body;
+        p.targetBody = payload.body;
       }
       remotePlayers[payload.id].lastUpdate = Date.now();
     }
@@ -232,7 +221,7 @@ function updateLocalPlayer() {
 
   if (gameRoom && gameActive) {
     const now = Date.now();
-    if (now - lastSendTime > 250) {
+    if (now - lastSendTime > 100) {
       lastSendTime = now;
       gameRoom.send({
         type: 'broadcast',
@@ -253,38 +242,45 @@ function updateLocalPlayer() {
 }
 
 // ==========================================
-// 4. RENDERIZADO CON PREDICCIÓN Y SUAVIZADO ABSOLUTO
+// 4. RENDERIZADO CON MOVIMIENTO CONTINUO Y SIN SALTOS
 // ==========================================
 function drawPlayer(p, camera, isLocal = false) {
-  if (!p.body || p.body.length === 0) return;
-
   if (!isLocal) {
-    // Si tenemos una posición objetivo, aplicamos dead reckoning + lerp ultra suave
-    if (p.targetX !== undefined && p.targetY !== undefined) {
-      // Predicción de movimiento continuo entre paquetes
-      p.x += (p.vx || 0);
-      p.y += (p.vy || 0);
+    if (p.targetAngle !== undefined) {
+      // Movimiento continuo predecible basado en su ángulo real
+      if (!p.x) p.x = p.targetX;
+      if (!p.y) p.y = p.targetY;
 
-      // Corrección suave hacia la posición real del servidor
-      p.x += (p.targetX - p.x) * 0.12;
-      p.y += (p.targetY - p.y) * 0.12;
+      const remoteSpeed = 3.5;
+      p.x += Math.cos(p.targetAngle) * remoteSpeed;
+      p.y += Math.sin(p.targetAngle) * remoteSpeed;
+
+      // Corrección elástica suave hacia la posición exacta del servidor
+      if (p.targetX !== undefined && p.targetY !== undefined) {
+        p.x += (p.targetX - p.x) * 0.1;
+        p.y += (p.targetY - p.y) * 0.1;
+      }
+    }
+
+    // Actualización fluida del cuerpo remoto
+    if (p.targetBody && Array.isArray(p.targetBody)) {
+      if (!p.body || p.body.length === 0) {
+        p.body = JSON.parse(JSON.stringify(p.targetBody));
+      } else {
+        for (let i = 0; i < Math.min(p.body.length, p.targetBody.length); i++) {
+          p.body[i].x += (p.targetBody[i].x - p.body[i].x) * 0.2;
+          p.body[i].y += (p.targetBody[i].y - p.body[i].y) * 0.2;
+        }
+      }
     }
   }
 
+  if (!p.body || p.body.length === 0) return;
+
   for (let i = p.body.length - 1; i >= 0; i--) {
     const seg = p.body[i];
-
-    if (!isLocal) {
-      if (!seg.currentX) { seg.currentX = seg.x; seg.currentY = seg.y; }
-      seg.currentX += (seg.x - seg.currentX) * 0.15;
-      seg.currentY += (seg.y - seg.currentY) * 0.15;
-    }
-
-    const drawX = isLocal ? seg.x : seg.currentX;
-    const drawY = isLocal ? seg.y : seg.currentY;
-
-    const screenX = drawX - camera.x;
-    const screenY = drawY - camera.y;
+    const screenX = seg.x - camera.x;
+    const screenY = seg.y - camera.y;
 
     if (screenX < -40 || screenX > canvas.width + 40 || screenY < -40 || screenY > canvas.height + 40) continue;
 
@@ -375,7 +371,7 @@ function startTimer() {
   }, 1000);
 }
 
-// Bucle de juego controlado a 60 FPS estables para evitar saturación y bloqueos
+// Bucle de juego controlado a 60 FPS estables
 let lastTime = 0;
 const fpsInterval = 1000 / 60;
 
