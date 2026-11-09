@@ -29,6 +29,15 @@ let currentPhase = 'PREPARATION';
 let timeLeft = PREPARATION_TIME;
 let timerInterval = null;
 
+// ==========================================
+// CORRECCIÓN DE SALDO: Descontar apuesta al entrar
+// ==========================================
+let currentBalance = parseInt(localStorage.getItem('user_balance')) || 5000;
+if (currentBalance >= selectedEntryFee) {
+  currentBalance -= selectedEntryFee;
+  localStorage.setItem('user_balance', currentBalance);
+}
+
 const mouse = { x: canvas.width / 2, y: canvas.height / 2 };
 let isBoosting = false;
 
@@ -129,7 +138,7 @@ let player = {
   radius: 12,
   body: [],
   length: 20,
-  ves: selectedEntryFee,
+  ves: selectedEntryFee, // Inicia con su apuesta base
   skinId: selectedSkin,
   alive: true
 };
@@ -199,13 +208,14 @@ function updateLocalPlayer() {
     player.body.pop();
   }
 
+  // Recolectar botín y sumar VES en tiempo real
   for (let i = sharedLootOrbs.length - 1; i >= 0; i--) {
     const orb = sharedLootOrbs[i];
     const dx = player.x - orb.x;
     const dy = player.y - orb.y;
     if (Math.abs(dx) < 30 && Math.abs(dy) < 30) {
       if (Math.hypot(dx, dy) < player.radius + orb.radius + 8) {
-        player.ves += orb.ves;
+        player.ves += orb.ves; // Suma directa al gusanito
         sharedLootOrbs.splice(i, 1);
 
         if (gameRoom) {
@@ -247,7 +257,6 @@ function updateLocalPlayer() {
 function drawPlayer(p, camera, isLocal = false) {
   if (!isLocal) {
     if (p.targetAngle !== undefined) {
-      // Movimiento continuo predecible basado en su ángulo real
       if (!p.x) p.x = p.targetX;
       if (!p.y) p.y = p.targetY;
 
@@ -255,14 +264,12 @@ function drawPlayer(p, camera, isLocal = false) {
       p.x += Math.cos(p.targetAngle) * remoteSpeed;
       p.y += Math.sin(p.targetAngle) * remoteSpeed;
 
-      // Corrección elástica suave hacia la posición exacta del servidor
       if (p.targetX !== undefined && p.targetY !== undefined) {
         p.x += (p.targetX - p.x) * 0.1;
         p.y += (p.targetY - p.y) * 0.1;
       }
     }
 
-    // Actualización fluida del cuerpo remoto
     if (p.targetBody && Array.isArray(p.targetBody)) {
       if (!p.body || p.body.length === 0) {
         p.body = JSON.parse(JSON.stringify(p.targetBody));
@@ -436,6 +443,17 @@ function endGame(survived, reason) {
   if (endModal) endModal.style.display = 'flex';
 
   const finalAmount = survived ? Math.floor(player.ves) : 0;
+
+  // Acreditar el saldo acumulado al ganar en la cuenta global
+  if (survived) {
+    let savedBalance = parseInt(localStorage.getItem('user_balance')) || 0;
+    savedBalance += finalAmount;
+    localStorage.setItem('user_balance', savedBalance);
+
+    if (typeof addPlayerBalance === 'function') {
+      addPlayerBalance(finalAmount);
+    }
+  }
 
   if (survived && typeof finishGameAndReward === 'function') {
     finishGameAndReward(finalAmount);
