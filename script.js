@@ -69,7 +69,6 @@ const myPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
 let remotePlayers = {}; 
 let sharedLootOrbs = []; // Esferas de botín compartidas en tiempo real
 
-// Creamos un nombre de canal único basado en la tarifa de entrada elegida (ej: 'arena_ves_50', 'arena_ves_1000')
 const roomChannelName = `arena_ves_${selectedEntryFee}`;
 
 if (typeof supabaseClient !== 'undefined' && supabaseClient) {
@@ -81,9 +80,19 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
     if (payload.id !== myPlayerId) {
       if (!remotePlayers[payload.id]) {
         remotePlayers[payload.id] = payload;
+        remotePlayers[payload.id].vx = 0;
+        remotePlayers[payload.id].vy = 0;
       } else {
         let p = remotePlayers[payload.id];
-        // Guardamos los objetivos para suavizar el movimiento y evitar saltos
+        
+        // Calculamos la velocidad estimada basada en el cambio de posición en el tiempo
+        const now = Date.now();
+        const dt = (now - (p.lastUpdate || now)) / 1000;
+        if (dt > 0) {
+          p.vx = (payload.x - p.x) / (dt * 10);
+          p.vy = (payload.y - p.y) / (dt * 10);
+        }
+
         p.targetX = payload.x;
         p.targetY = payload.y;
         p.targetAngle = payload.angle;
@@ -101,12 +110,10 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
     }
   });
 
-  // Sincronizar aparición de botín por red
   gameRoom.on('broadcast', { event: 'spawn_loot' }, ({ payload }) => {
     sharedLootOrbs.push(payload);
   });
 
-  // Sincronizar recolección de botín por red
   gameRoom.on('broadcast', { event: 'collect_loot' }, ({ payload }) => {
     if (sharedLootOrbs[payload.index]) {
       sharedLootOrbs.splice(payload.index, 1);
@@ -169,7 +176,6 @@ function dropLootOnDeath(x, y, totalVes) {
   }
 }
 
-// Control de tiempo para evitar saturación de red (Error 429)
 let lastSendTime = 0;
 
 function updateLocalPlayer() {
@@ -180,7 +186,6 @@ function updateLocalPlayer() {
 
   let currentSpeed = player.speed;
 
-  // Lógica del Turbo (Aumenta velocidad y consume un poco de VES si tiene más del 10% del costo inicial)
   if (isBoosting && player.ves > (selectedEntryFee * 0.1)) {
     currentSpeed = 6.0;
     player.ves -= (selectedEntryFee * 0.0005);
@@ -205,7 +210,6 @@ function updateLocalPlayer() {
     player.body.pop();
   }
 
-  // Recoger esferas de botín en el mapa
   for (let i = sharedLootOrbs.length - 1; i >= 0; i--) {
     const orb = sharedLootOrbs[i];
     const dx = player.x - orb.x;
@@ -215,7 +219,6 @@ function updateLocalPlayer() {
         player.ves += orb.ves;
         sharedLootOrbs.splice(i, 1);
 
-        // Avisar a los demás que esta esfera fue recogida
         if (gameRoom) {
           gameRoom.send({
             type: 'broadcast',
@@ -227,7 +230,6 @@ function updateLocalPlayer() {
     }
   }
 
-  // Enviar nuestra posición con límite de tiempo (cada 250ms) para evitar error 429
   if (gameRoom && gameActive) {
     const now = Date.now();
     if (now - lastSendTime > 250) {
@@ -251,25 +253,31 @@ function updateLocalPlayer() {
 }
 
 // ==========================================
-// 4. RENDERIZADO EN PANTALLA CON SUAVIZADO AVANZADO
+// 4. RENDERIZADO CON PREDICCIÓN Y SUAVIZADO ABSOLUTO
 // ==========================================
 function drawPlayer(p, camera, isLocal = false) {
   if (!p.body || p.body.length === 0) return;
 
-  // Si es un jugador remoto, interpolamos su cabeza suavemente
-  if (!isLocal && p.targetX !== undefined && p.targetY !== undefined) {
-    p.x += (p.targetX - p.x) * 0.2;
-    p.y += (p.targetY - p.y) * 0.2;
+  if (!isLocal) {
+    // Si tenemos una posición objetivo, aplicamos dead reckoning + lerp ultra suave
+    if (p.targetX !== undefined && p.targetY !== undefined) {
+      // Predicción de movimiento continuo entre paquetes
+      p.x += (p.vx || 0);
+      p.y += (p.vy || 0);
+
+      // Corrección suave hacia la posición real del servidor
+      p.x += (p.targetX - p.x) * 0.12;
+      p.y += (p.targetY - p.y) * 0.12;
+    }
   }
 
   for (let i = p.body.length - 1; i >= 0; i--) {
     const seg = p.body[i];
 
-    // Si es remoto, suavizamos también las posiciones de los segmentos del cuerpo
     if (!isLocal) {
       if (!seg.currentX) { seg.currentX = seg.x; seg.currentY = seg.y; }
-      seg.currentX += (seg.x - seg.currentX) * 0.25;
-      seg.currentY += (seg.y - seg.currentY) * 0.25;
+      seg.currentX += (seg.x - seg.currentX) * 0.15;
+      seg.currentY += (seg.y - seg.currentY) * 0.15;
     }
 
     const drawX = isLocal ? seg.x : seg.currentX;
