@@ -251,15 +251,32 @@ function updateLocalPlayer() {
 }
 
 // ==========================================
-// 4. RENDERIZADO EN PANTALLA
+// 4. RENDERIZADO EN PANTALLA CON SUAVIZADO AVANZADO
 // ==========================================
 function drawPlayer(p, camera, isLocal = false) {
   if (!p.body || p.body.length === 0) return;
 
+  // Si es un jugador remoto, interpolamos su cabeza suavemente
+  if (!isLocal && p.targetX !== undefined && p.targetY !== undefined) {
+    p.x += (p.targetX - p.x) * 0.2;
+    p.y += (p.targetY - p.y) * 0.2;
+  }
+
   for (let i = p.body.length - 1; i >= 0; i--) {
     const seg = p.body[i];
-    const screenX = seg.x - camera.x;
-    const screenY = seg.y - camera.y;
+
+    // Si es remoto, suavizamos también las posiciones de los segmentos del cuerpo
+    if (!isLocal) {
+      if (!seg.currentX) { seg.currentX = seg.x; seg.currentY = seg.y; }
+      seg.currentX += (seg.x - seg.currentX) * 0.25;
+      seg.currentY += (seg.y - seg.currentY) * 0.25;
+    }
+
+    const drawX = isLocal ? seg.x : seg.currentX;
+    const drawY = isLocal ? seg.y : seg.currentY;
+
+    const screenX = drawX - camera.x;
+    const screenY = drawY - camera.y;
 
     if (screenX < -40 || screenX > canvas.width + 40 || screenY < -40 || screenY > canvas.height + 40) continue;
 
@@ -299,12 +316,6 @@ function checkRealPlayerCollisions() {
   });
 
   Object.values(remotePlayers).forEach(friend => {
-    // Suavizado fluido de jugadores remotos para evitar saltos
-    if (friend.targetX !== undefined && friend.targetY !== undefined) {
-      friend.x += (friend.targetX - friend.x) * 0.25;
-      friend.y += (friend.targetY - friend.y) * 0.25;
-    }
-
     if (!friend.body) return;
     for (let seg of friend.body) {
       if (Math.abs(player.x - seg.x) < 20 && Math.abs(player.y - seg.y) < 20) {
