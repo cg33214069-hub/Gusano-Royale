@@ -326,21 +326,35 @@ function checkRealPlayerCollisions() {
     }
   });
 
+  // Colisiones justas y precisas contra jugadores remotos
   Object.values(remotePlayers).forEach(friend => {
     if (!friend.body) return;
-    for (let seg of friend.body) {
-      if (Math.abs(player.x - seg.x) < 20 && Math.abs(player.y - seg.y) < 20) {
-        if (Math.hypot(player.x - seg.x, player.y - seg.y) < 14) {
-          player.alive = false;
-          
-          dropLootOnDeath(player.x, player.y, player.ves);
 
-          if (gameRoom) {
-            gameRoom.send({ type: 'broadcast', event: 'player_died', payload: { id: player.id } });
-          }
-          endGame(false, `Chocaste contra ${friend.name}. ¡Has quedado eliminado!`);
-          break;
+    // 1. Revisar impacto de tu cabeza contra el cuerpo de otro gusano
+    for (let seg of friend.body) {
+      if (Math.hypot(player.x - seg.x, player.y - seg.y) < player.radius + 6) {
+        player.alive = false;
+        dropLootOnDeath(player.x, player.y, player.ves);
+
+        if (gameRoom) {
+          gameRoom.send({ type: 'broadcast', event: 'player_died', payload: { id: player.id } });
         }
+        endGame(false, `Chocaste contra el cuerpo de ${friend.name}. ¡Has quedado eliminado!`);
+        return;
+      }
+    }
+
+    // 2. Revisar choque frontal de cabezas (el que tenga menor VES o impacto directo muere)
+    if (friend.targetX !== undefined && friend.targetY !== undefined) {
+      if (Math.hypot(player.x - friend.targetX, player.y - friend.targetY) < player.radius + 10) {
+        player.alive = false;
+        dropLootOnDeath(player.x, player.y, player.ves);
+
+        if (gameRoom) {
+          gameRoom.send({ type: 'broadcast', event: 'player_died', payload: { id: player.id } });
+        }
+        endGame(false, `Choque frontal con ${friend.name}. ¡Eliminado!`);
+        return;
       }
     }
   });
