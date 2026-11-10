@@ -260,15 +260,22 @@
           if (error) throw error;
 
           if (data.user) {
-            await supabaseClient.from('profiles').insert([
+            // CORREGIDO: Ahora incluimos 'email' para que no quede en null y se guarde todo perfectamente
+            const { error: profileError } = await supabaseClient.from('profiles').insert([
               { 
                 id: data.user.id, 
                 full_name: fullname,
                 username: username, 
                 phone: phone,
+                email: email, // <-- ¡AQUÍ ESTABA EL DETALLE!
                 balance: 0 
               }
             ]);
+            
+            if (profileError) {
+              console.error("Error al crear perfil:", profileError);
+              throw profileError;
+            }
           }
 
           alert("¡Registro exitoso! Ya puedes iniciar sesión con tus datos.");
@@ -280,7 +287,6 @@
 
           alert("¡Bienvenido de vuelta!");
           
-          // CORREGIDO: Se valida de forma segura sin romper si la variable no existe en el login
           const userNick = email.split('@')[0];
           localStorage.setItem('player_name', userNick);
           localStorage.setItem('selected_entry', '100');
@@ -294,7 +300,6 @@
         authBtn.innerText = isRegistering ? "Registrarse" : "Iniciar Sesión";
       }
     }
-
     // EMITIR EVENTOS DE BOTONES TÁCTILES A Nivel GLOBAL
     function sendDirection(dirKey) {
       const event = new KeyboardEvent('keydown', { key: dirKey, bubbles: true });
