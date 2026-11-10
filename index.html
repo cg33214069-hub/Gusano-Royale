@@ -143,7 +143,7 @@
 
         <div class="input-group">
           <label for="phone-input">Número de Teléfono / Celular</label>
-          <input type="text" id="phone-input" placeholder="Ej. 0412-1234567">
+          <input type="text" id="phone-input" placeholder="Ej. +584121234567">
         </div>
       </div>
 
@@ -243,6 +243,12 @@
             authBtn.innerText = "Registrarse";
             return;
           }
+          if (!phone.startsWith('+58')) {
+            alert("⚠️ Por favor ingresa el número de teléfono con el código de país (Ej. +584121234567).");
+            authBtn.disabled = false;
+            authBtn.innerText = "Registrarse";
+            return;
+          }
           if (password !== confirmPassword) {
             alert("❌ Las contraseñas no coinciden. Por favor verifícalas.");
             authBtn.disabled = false;
@@ -260,14 +266,13 @@
           if (error) throw error;
 
           if (data.user) {
-            // CORREGIDO: Ahora incluimos 'email' para que no quede en null y se guarde todo perfectamente
             const { error: profileError } = await supabaseClient.from('profiles').insert([
               { 
                 id: data.user.id, 
                 full_name: fullname,
                 username: username, 
                 phone: phone,
-                email: email, // <-- ¡AQUÍ ESTABA EL DETALLE!
+                email: email,
                 balance: 0 
               }
             ]);
@@ -300,6 +305,7 @@
         authBtn.innerText = isRegistering ? "Registrarse" : "Iniciar Sesión";
       }
     }
+
     // EMITIR EVENTOS DE BOTONES TÁCTILES A Nivel GLOBAL
     function sendDirection(dirKey) {
       const event = new KeyboardEvent('keydown', { key: dirKey, bubbles: true });
