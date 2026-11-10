@@ -183,6 +183,15 @@
   </div>
 
   <script>
+    // Registro de Service Worker para PWA (Limpia la caché vieja y conecta Supabase)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => console.log('Service Worker activo:', reg.scope))
+          .catch((err) => console.error('Error en Service Worker:', err));
+      });
+    }
+
     // Inicialización segura de Supabase global
     const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
@@ -306,7 +315,7 @@
       }
     }
 
-    // EMITIR EVENTOS DE BOTONES TÁCTILES A Nivel GLOBAL
+    // EMITIR EVENTOS DE BOTONES TÁCTILES A NIVEL GLOBAL
     function sendDirection(dirKey) {
       const event = new KeyboardEvent('keydown', { key: dirKey, bubbles: true });
       window.dispatchEvent(event);
