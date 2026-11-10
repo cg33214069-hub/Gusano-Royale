@@ -4,6 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gusanos Royale - Panel Admin & Finanzas</title>
+  
+  <!-- ========================================== -->
+  <!-- SCRIPT DE SEGURIDAD Y CONTRASEÑA ADMIN     -->
+  <!-- ========================================== -->
+  <script>
+    // Define aquí tu contraseña secreta de administrador
+    const ADMIN_PASSWORD = "Cesar2026*gusano"; 
+
+    // Verificamos si ya inició sesión en esta pestaña del navegador
+    if (sessionStorage.getItem('admin_authenticated') !== 'true') {
+      let userEntry = prompt("🔒 ACCESO RESTRINGIDO\nIngresa la contraseña de administrador:");
+      
+      if (userEntry === ADMIN_PASSWORD) {
+        sessionStorage.setItem('admin_authenticated', 'true');
+        alert("¡Acceso concedido, GOMEZ! Bienvenido al panel.");
+      } else {
+        alert("Contraseña incorrecta. Acceso denegado.");
+        // Redirige al usuario de inmediato al inicio del juego
+        window.location.href = "index.html"; 
+      }
+    }
+  </script>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Inter, sans-serif; }
