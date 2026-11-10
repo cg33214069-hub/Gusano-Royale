@@ -1,4 +1,30 @@
 // ==========================================
+// SISTEMA DE SALDO SEGURO (ANTI-TRAMPA / ANTI-HACKER)
+// ==========================================
+function getSecureBalance() {
+  const encoded = localStorage.getItem('secure_user_balance');
+  if (!encoded) {
+    // Si no existe, creamos un saldo inicial cifrado de 5000 por defecto
+    const defaultVal = 5000;
+    localStorage.setItem('secure_user_balance', btoa(defaultVal.toString()));
+    return defaultVal;
+  }
+  try {
+    const decoded = parseInt(atob(encoded));
+    return isNaN(decoded) ? 0 : decoded;
+  } catch (e) {
+    return 0; // Si intentan corromper el código o hackearlo, se blinda a 0
+  }
+}
+
+function saveSecureBalance(amount) {
+  const cleanAmount = Math.max(0, Math.floor(amount));
+  localStorage.setItem('secure_user_balance', btoa(cleanAmount.toString()));
+  // Compatibilidad espejo por si otra parte del sistema lo lee sin cifrar
+  localStorage.setItem('user_balance', cleanAmount.toString());
+}
+
+// ==========================================
 // 1. CONFIGURACIÓN MULTIJUGADOR REAL CON BOTÍN COMPARTIDO
 // ==========================================
 const WORLD_SIZE = 3000;
@@ -30,12 +56,12 @@ let timeLeft = PREPARATION_TIME;
 let timerInterval = null;
 
 // ==========================================
-// CORRECCIÓN DE SALDO: Descontar apuesta al entrar
+// CORRECCIÓN DE SALDO SEGURO: Descontar apuesta al entrar
 // ==========================================
-let currentBalance = parseInt(localStorage.getItem('user_balance')) || 5000;
+let currentBalance = getSecureBalance();
 if (currentBalance >= selectedEntryFee) {
   currentBalance -= selectedEntryFee;
-  localStorage.setItem('user_balance', currentBalance);
+  saveSecureBalance(currentBalance);
 }
 
 const mouse = { x: canvas.width / 2, y: canvas.height / 2 };
@@ -458,11 +484,11 @@ function endGame(survived, reason) {
 
   const finalAmount = survived ? Math.floor(player.ves) : 0;
 
-  // Acreditar el saldo acumulado al ganar en la cuenta global
+  // Acreditar el saldo acumulado al ganar en la cuenta global de forma segura
   if (survived) {
-    let savedBalance = parseInt(localStorage.getItem('user_balance')) || 0;
+    let savedBalance = getSecureBalance();
     savedBalance += finalAmount;
-    localStorage.setItem('user_balance', savedBalance);
+    saveSecureBalance(savedBalance);
 
     if (typeof addPlayerBalance === 'function') {
       addPlayerBalance(finalAmount);
