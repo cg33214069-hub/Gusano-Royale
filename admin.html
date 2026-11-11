@@ -9,10 +9,8 @@
   <!-- SCRIPT DE SEGURIDAD Y CONTRASEÑA ADMIN     -->
   <!-- ========================================== -->
   <script>
-    // Define aquí tu contraseña secreta de administrador
     const ADMIN_PASSWORD = "Cesar2026*gusano"; 
 
-    // Verificamos si ya inició sesión en esta pestaña del navegador
     if (sessionStorage.getItem('admin_authenticated') !== 'true') {
       let userEntry = prompt("🔒 ACCESO RESTRINGIDO\nIngresa la contraseña de administrador:");
       
@@ -21,7 +19,6 @@
         alert("¡Acceso concedido, GOMEZ! Bienvenido al panel.");
       } else {
         alert("Contraseña incorrecta. Acceso denegado.");
-        // Redirige al usuario de inmediato al inicio del juego
         window.location.href = "index.html"; 
       }
     }
@@ -77,6 +74,15 @@
     .metric-value.green { color: #22c55e; }
     .metric-value.red { color: #ef4444; }
     .metric-value.blue { color: #38bdf8; }
+
+    /* TARJETA DE CONTROL DE BOTS AVANZADO */
+    .bots-control-card {
+      background: #0b0f19;
+      border: 1px solid rgba(234, 179, 8, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
 
     /* BUSCADOR Y GESTIÓN RÁPIDA DE USUARIOS */
     .search-box-card {
@@ -138,7 +144,7 @@
       color: #fff;
     }
 
-    .tabs { display: flex; gap: 12px; margin-bottom: 20px; }
+    .tabs { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
     .tab-btn {
       background: #0f172a;
       color: #94a3b8;
@@ -296,8 +302,36 @@
   <div class="admin-container">
     <header>
       <h1>🛡️ Panel de Administración - Gusanos Royale</h1>
-      <button onclick="loadData()" style="background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">🔄 Actualizar Datos</button>
+      <button onclick="loadData(); loadPromotoresData(); chequearEstadoBots();" style="background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">🔄 Actualizar Datos</button>
     </header>
+
+    <!-- CONTROL DE BOTS AVANZADO -->
+    <div class="bots-control-card">
+      <div style="margin-bottom: 15px;">
+        <h3 style="color: #eab308; font-size: 1.1rem; margin-bottom: 4px;">🤖 Configuración Avanzada de Bots en Salas</h3>
+        <p style="color: #94a3b8; font-size: 0.85rem;">Define la cantidad de bots y el monto de inversión/botín que soltarán en cualquier sala.</p>
+      </div>
+
+      <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center; margin-bottom: 15px;">
+        <div style="flex: 1; min-width: 200px;">
+          <label style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 6px;">Cantidad de Bots</label>
+          <input type="number" id="input-num-bots" value="6" min="1" max="30" style="width: 100%; background: #030712; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; color: #fff;">
+        </div>
+        <div style="flex: 1; min-width: 200px;">
+          <label style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 6px;">Botín por Bot (VES)</label>
+          <input type="number" id="input-bot-ves" value="20" min="5" step="5" style="width: 100%; background: #030712; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; color: #fff;">
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button id="btn-toggle-bots" onclick="alternarBotsConConfig()" style="background: #334155; color: #fff; font-weight: bold; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem; flex: 2;">
+          Cargando estado...
+        </button>
+        <button onclick="guardarConfigBots()" style="background: #38bdf8; color: #000; font-weight: bold; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; flex: 1;">
+          💾 Guardar Ajustes
+        </button>
+      </div>
+    </div>
 
     <!-- TARJETAS DE MÉTRICAS FINANCIERAS -->
     <div class="metrics-grid">
@@ -342,6 +376,7 @@
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('deposits', this)">💳 Solicitudes de Depósito</button>
       <button class="tab-btn" onclick="switchTab('withdrawals', this)">💸 Solicitudes de Retiro</button>
+      <button class="tab-btn" onclick="switchTab('promoters', this)">💼 Gestión de Promotores</button>
     </div>
 
     <!-- TABLA DE DEPÓSITOS -->
@@ -385,6 +420,45 @@
         </tbody>
       </table>
     </div>
+
+    <!-- SECCIÓN DE GESTIÓN DE PROMOTORES -->
+    <div id="section-promoters" class="card" style="display: none;">
+      <h2 style="font-size: 1.2rem; margin-bottom: 16px; color: #38bdf8;">💼 Módulo de Promotores y Comisiones</h2>
+
+      <!-- Formulario para Registrar Promotor -->
+      <div style="background:#030712; padding:18px; border-radius:10px; border:1px solid rgba(255,255,255,0.08); margin-bottom:24px;">
+        <h3 style="font-size: 1rem; margin-bottom: 12px; color: #fff;">➕ Registrar Nuevo Promotor</h3>
+        <form id="form-crear-promotor" onsubmit="crearPromotor(event)" style="display:flex; flex-wrap:wrap; gap:12px;">
+          <input type="text" id="p_nombre" placeholder="Nombre Completo" required style="flex:1 1 45%; padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#0b0f19; color:#fff;">
+          <input type="text" id="p_cedula" placeholder="Cédula de Identidad" required style="flex:1 1 45%; padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#0b0f19; color:#fff;">
+          <input type="text" id="p_telefono" placeholder="Teléfono" required style="flex:1 1 45%; padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#0b0f19; color:#fff;">
+          <input type="email" id="p_correo" placeholder="Correo Electrónico" required style="flex:1 1 45%; padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#0b0f19; color:#fff;">
+          <input type="text" id="p_codigo" placeholder="Código de Acceso Privado (ej: PROMO-César01)" required style="flex:1 1 100%; padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#0b0f19; color:#fff;">
+          
+          <button type="submit" style="background:#22c55e; color:#fff; border:none; padding:12px 20px; border-radius:6px; font-weight:bold; cursor:pointer; width:100%;">
+            Crear Cuenta de Promotor
+          </button>
+        </form>
+      </div>
+
+      <!-- Tabla de Solicitudes Pendientes de Promotores -->
+      <h3 style="font-size: 1rem; margin-bottom: 12px; color: #fff;">📋 Solicitudes de Comisiones por Verificar (100 Bs)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Promotor</th>
+            <th>Usuario Invitado</th>
+            <th>Depósito Reportado</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="promoter-reports-table-body">
+          <tr><td colspan="5" style="text-align: center; color: #64748b;">No hay reportes pendientes de promotores.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
   </div>
 
   <!-- MODAL DE APROBACIÓN DE DEPÓSITO Y FACTURA -->
@@ -489,16 +563,93 @@
     let activeWithdrawal = null; 
     let activeDeposit = null; 
 
+    // ==========================================
+    // CONTROL DE BOTS Y CONFIGURACIÓN EN SALAS
+    // ==========================================
+    async function chequearEstadoBots() {
+        const { data } = await supabaseClient
+            .from('configuracion_juego')
+            .select('*')
+            .in('clave', ['bots_activos', 'cantidad_bots', 'monto_bot_ves']);
+        
+        if (data) {
+            data.forEach(item => {
+                if (item.clave === 'bots_activos') {
+                    const activo = (item.valor === 'true' || item.valor === true);
+                    actualizarBotonUI(activo);
+                }
+                if (item.clave === 'cantidad_bots') {
+                    document.getElementById('input-num-bots').value = item.valor;
+                }
+                if (item.clave === 'monto_bot_ves') {
+                    document.getElementById('input-bot-ves').value = item.valor;
+                }
+            });
+        }
+    }
+
+    async function guardarConfigBots() {
+        const cant = document.getElementById('input-num-bots').value;
+        const monto = document.getElementById('input-bot-ves').value;
+
+        await supabaseClient.from('configuracion_juego').upsert([
+            { clave: 'cantidad_bots', valor: String(cant) },
+            { clave: 'monto_bot_ves', valor: String(monto) }
+        ], { onConflict: 'clave' });
+        
+        alert("¡Configuración de bots guardada con éxito!");
+    }
+
+    async function alternarBotsConConfig() {
+        const { data } = await supabaseClient
+            .from('configuracion_juego')
+            .select('valor')
+            .eq('clave', 'bots_activos')
+            .single();
+
+        const estadoActual = data ? (data.valor === 'true' || data.valor === true) : false;
+        const nuevoEstado = !estadoActual;
+
+        await supabaseClient.from('configuracion_juego').upsert({ 
+            clave: 'bots_activos', 
+            valor: String(nuevoEstado) 
+        }, { onConflict: 'clave' });
+
+        await guardarConfigBots();
+        actualizarBotonUI(nuevoEstado);
+        alert(nuevoEstado ? '🟢 ¡Bots ACTIVOS y configurados en las salas!' : '🔴 Bots DESACTIVADOS.');
+    }
+
+    function actualizarBotonUI(activo) {
+        const btn = document.getElementById('btn-toggle-bots');
+        if (activo) {
+            btn.innerText = '🟢 Bots ACTIVOS (Clic para Apagar)';
+            btn.style.background = '#22c55e';
+            btn.style.color = '#000';
+        } else {
+            btn.innerText = '🔴 Bots APAGADOS (Clic para Activar)';
+            btn.style.background = '#ef4444';
+            btn.style.color = '#fff';
+        }
+    }
+
+    chequearEstadoBots();
+
     function switchTab(type, btnElement) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       btnElement.classList.add('active');
 
+      document.getElementById('section-deposits').style.display = 'none';
+      document.getElementById('section-withdrawals').style.display = 'none';
+      document.getElementById('section-promoters').style.display = 'none';
+
       if (type === 'deposits') {
         document.getElementById('section-deposits').style.display = 'block';
-        document.getElementById('section-withdrawals').style.display = 'none';
-      } else {
-        document.getElementById('section-deposits').style.display = 'none';
+      } else if (type === 'withdrawals') {
         document.getElementById('section-withdrawals').style.display = 'block';
+      } else if (type === 'promoters') {
+        document.getElementById('section-promoters').style.display = 'block';
+        loadPromotoresData();
       }
     }
 
@@ -618,7 +769,17 @@
       document.getElementById('metric-moving-balance').innerText = `${movingBalance.toLocaleString('es-VE')} VES`;
     }
 
-    // BUSCAR USUARIO Y SALDO
+    async function rejectTransaction(table, id) {
+      if (!confirm("¿Estás seguro de rechazar esta solicitud?")) return;
+      const { error } = await supabaseClient.from(table).update({ status: 'Rechazado' }).eq('id', id);
+      if (error) {
+        alert("Error al rechazar: " + error.message);
+      } else {
+        alert("Solicitud rechazada con éxito.");
+        loadData();
+      }
+    }
+
     async function searchUserBalance() {
       const query = document.getElementById('search-user-input').value.trim();
       if (!query) {
@@ -653,7 +814,6 @@
       }
     }
 
-    // SUMAR O RESTAR SALDO DIRECTAMENTE DESDE EL PANEL
     async function modifyUserBalance(type) {
       if (!currentFoundUser) {
         alert("Primero debes buscar y seleccionar un usuario.");
@@ -688,25 +848,23 @@
         .eq('id', currentFoundUser.id);
 
       if (error) {
-        alert("Error al actualizar saldo: " + error.message);
+        alert("Error al actualizar el saldo: " + error.message);
       } else {
-        alert("¡Saldo actualizado con éxito en la plataforma!");
-        currentFoundUser.balance = newBalance;
-        document.getElementById('res-balance').innerText = newBalance.toLocaleString('es-VE');
+        alert("¡Saldo actualizado con éxito!");
         document.getElementById('action-amount').value = '';
+        searchUserBalance(); 
         loadData();
       }
     }
 
-    // MODAL Y ACCIONES DE DEPÓSITOS
-    function openDepositModal(id, username, amount, method, reference, phone) {
-      activeDeposit = { id, username, amount, method, reference };
+    function openDepositModal(depositId, userName, amount, method, reference, userPhone) {
+      activeDeposit = { id: depositId, user: userName, amount: amount, method: method, reference: reference };
       
-      document.getElementById('modal-dep-user').innerText = `@${username}`;
+      document.getElementById('modal-dep-user').innerText = userName;
       document.getElementById('modal-dep-method').innerText = method;
       document.getElementById('modal-dep-ref').innerText = reference;
       document.getElementById('modal-dep-amount').innerText = `${Number(amount).toLocaleString('es-VE')} VES`;
-      document.getElementById('input-dep-phone').value = phone || '';
+      document.getElementById('input-dep-phone').value = userPhone || '';
 
       document.getElementById('modal-deposit-overlay').style.display = 'flex';
     }
@@ -719,80 +877,80 @@
     async function confirmDepositAndSendInvoice() {
       if (!activeDeposit) return;
 
-      const { error } = await supabaseClient
+      const playerPhone = document.getElementById('input-dep-phone').value.trim();
+
+      const { error: depError } = await supabaseClient
         .from('deposits')
         .update({ status: 'Aprobado' })
         .eq('id', activeDeposit.id);
 
-      if (error) {
-        alert("Error al aprobar depósito: " + error.message);
+      if (depError) {
+        alert("Error al aprobar depósito: " + depError.message);
         return;
       }
 
-      const todayDate = new Date().toLocaleDateString('es-VE');
-      const invoiceText = 
-`🧾 *COMPROBANTE DE DEPÓSITO - GUSANOS ROYALE* 🪱🔥
+      const { data: depRecord } = await supabaseClient
+        .from('deposits')
+        .select('user_id, amount')
+        .eq('id', activeDeposit.id)
+        .single();
 
-¡Hola *@${activeDeposit.username}*! Tu depósito ha sido verificado y acreditado con éxito.
+      if (depRecord) {
+        let profileKey = String(depRecord.user_id).trim().toLowerCase();
+        let targetProfile = null;
 
-━━━━━━━━━━━━━━━━━━
-👤 *Usuario:* @${activeDeposit.username}
-💳 *Método:* ${activeDeposit.method}
-💰 *Monto Acreditado:* *${Number(activeDeposit.amount).toLocaleString('es-VE')} VES*
-🔢 *Referencia:* *${activeDeposit.reference}*
-📅 *Fecha:* ${todayDate}
-━━━━━━━━━━━━━━━━━━
+        for (let k in globalUserMap) {
+          if (k === profileKey || globalUserMap[k].id === depRecord.user_id) {
+            targetProfile = globalUserMap[k];
+            break;
+          }
+        }
 
-¡Ya tienes tu saldo disponible para entrar a las arenas y ganar en Gusanos Royale! 🚀`;
+        if (targetProfile) {
+          const { data: currentProf } = await supabaseClient
+            .from('profiles')
+            .select('balance')
+            .eq('id', targetProfile.id)
+            .single();
 
-      const rawPhone = document.getElementById('input-dep-phone').value.trim();
-      let cleanPhone = rawPhone.replace(/[^0-9]/g, '');
-      if (cleanPhone.startsWith('0')) {
-        cleanPhone = '58' + cleanPhone.substring(1);
-      } else if (!cleanPhone.startsWith('58') && cleanPhone.length === 10) {
-        cleanPhone = '58' + cleanPhone;
+          const newBal = Number(currentProf?.balance || 0) + Number(depRecord.amount);
+          await supabaseClient
+            .from('profiles')
+            .update({ balance: newBal })
+            .eq('id', targetProfile.id);
+        }
       }
 
-      let whatsappUrl = `https://wa.me/?text=${encodeURIComponent(invoiceText)}`;
-      if (cleanPhone) {
-        whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(invoiceText)}`;
-      }
-
-      window.open(whatsappUrl, '_blank');
-
-      alert("¡Depósito aprobado y factura generada!");
+      alert("¡Depósito aprobado y saldo acreditado con éxito!");
       closeDepositModal();
       loadData();
+
+      if (playerPhone) {
+        const msg = `🧾 *FACTURA / RECIBO DE PAGO - GUSANOS ROYALE*\n\n` +
+                    `¡Hola *${activeDeposit.user}*! Tu depósito ha sido *APROBADO* exitosamente.\n\n` +
+                    `• *Método:* ${activeDeposit.method}\n` +
+                    `• *Referencia:* ${activeDeposit.reference}\n` +
+                    `• *Monto Acreditado:* ${Number(activeDeposit.amount).toLocaleString('es-VE')} VES\n\n` +
+                    `¡Ya puedes entrar a la plataforma y disfrutar de las salas de juego! 🚀🎮`;
+        
+        const waUrl = `https://api.whatsapp.com/send?phone=${playerPhone}&text=${encodeURIComponent(msg)}`;
+        window.open(waUrl, '_blank');
+      }
     }
 
-    // MODAL Y ACCIONES DE RETIROS
-    function openWithdrawalModal(id, username, amount, accountDetails, phone) {
-      activeWithdrawal = { id, username, amount, accountDetails };
-      
-      document.getElementById('modal-user-display').innerText = `@${username}`;
+    function openWithdrawalModal(withdrawalId, userName, amount, accountDetails, userPhone) {
+      activeWithdrawal = { id: withdrawalId, user: userName, amount: amount, account: accountDetails };
+
+      document.getElementById('modal-user-display').innerText = userName;
       document.getElementById('modal-account-display').innerText = accountDetails;
       document.getElementById('modal-requested-amount').innerText = `${Number(amount).toLocaleString('es-VE')} VES`;
       
       document.getElementById('input-commission-rate').value = 0;
       document.getElementById('input-bank-reference').value = '';
-      document.getElementById('input-user-phone').value = phone || '';
+      document.getElementById('input-user-phone').value = userPhone || '';
 
       recalculateWithdrawalModal();
       document.getElementById('modal-withdrawal-overlay').style.display = 'flex';
-    }
-
-    function recalculateWithdrawalModal() {
-      if (!activeWithdrawal) return;
-
-      const requested = Number(activeWithdrawal.amount);
-      const rate = parseFloat(document.getElementById('input-commission-rate').value) || 0;
-      
-      const fee = (requested * rate) / 100;
-      const netToDeposit = requested - fee;
-
-      document.getElementById('modal-fee-percent').innerText = rate;
-      document.getElementById('modal-fee-amount').innerText = `${fee.toLocaleString('es-VE')} VES`;
-      document.getElementById('modal-net-amount').innerText = `${netToDeposit.toLocaleString('es-VE')} VES`;
     }
 
     function closeWithdrawalModal() {
@@ -800,20 +958,34 @@
       activeWithdrawal = null;
     }
 
+    function recalculateWithdrawalModal() {
+      if (!activeWithdrawal) return;
+      const rate = Number(document.getElementById('input-commission-rate').value) || 0;
+      const requested = Number(activeWithdrawal.amount);
+      
+      const feeAmount = (requested * rate) / 100;
+      const netAmount = requested - feeAmount;
+
+      document.getElementById('modal-fee-percent').innerText = rate;
+      document.getElementById('modal-fee-amount').innerText = `${feeAmount.toLocaleString('es-VE')} VES`;
+      document.getElementById('modal-net-amount').innerText = `${netAmount.toLocaleString('es-VE')} VES`;
+    }
+
     async function confirmWithdrawalAndSendInvoice() {
       if (!activeWithdrawal) return;
 
-      const reference = document.getElementById('input-bank-reference').value.trim();
-      if (!reference) {
-        alert("Por favor ingresa el número de referencia bancaria.");
+      const refNum = document.getElementById('input-bank-reference').value.trim();
+      const playerPhone = document.getElementById('input-user-phone').value.trim();
+      const rate = Number(document.getElementById('input-commission-rate').value) || 0;
+
+      if (!refNum) {
+        alert("Por favor ingresa el número de referencia bancaria del pago móvil realizado.");
         return;
       }
 
       const requested = Number(activeWithdrawal.amount);
-      const rate = parseFloat(document.getElementById('input-commission-rate').value) || 0;
-      const fee = (requested * rate) / 100;
-      const netToDeposit = requested - fee;
-      const todayDate = new Date().toLocaleDateString('es-VE');
+      const feeAmount = (requested * rate) / 100;
+      const netAmount = requested - feeAmount;
 
       const { error } = await supabaseClient
         .from('withdrawals')
@@ -825,61 +997,81 @@
         return;
       }
 
-      const invoiceText = 
-`🧾 *COMPROBANTE DE RETIRO - GUSANOS ROYALE* 🪱🔥
-
-Hola *@${activeWithdrawal.username}*, tu solicitud de retiro ha sido procesada con éxito.
-
-━━━━━━━━━━━━━━━━━━
-👤 *Usuario:* @${activeWithdrawal.username}
-💰 *Monto Solicitado:* ${requested.toLocaleString('es-VE')} VES
-📉 *Comisión / Servicio (${rate}%):* ${fee.toLocaleString('es-VE')} VES
-✅ *Monto Depositado:* *${netToDeposit.toLocaleString('es-VE')} VES*
-🔢 *Referencia Bancaria:* *${reference}*
-📅 *Fecha:* ${todayDate}
-━━━━━━━━━━━━━━━━━━
-
-¡Gracias por jugar con nosotros! Revisa tu cuenta bancaria. 🚀`;
-
-      const rawPhone = document.getElementById('input-user-phone').value.trim();
-      let cleanPhone = rawPhone.replace(/[^0-9]/g, '');
-      if (cleanPhone.startsWith('0')) {
-        cleanPhone = '58' + cleanPhone.substring(1);
-      } else if (!cleanPhone.startsWith('58') && cleanPhone.length === 10) {
-        cleanPhone = '58' + cleanPhone;
-      }
-
-      let whatsappUrl = `https://wa.me/?text=${encodeURIComponent(invoiceText)}`;
-      if (cleanPhone) {
-        whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(invoiceText)}`;
-      }
-
-      window.open(whatsappUrl, '_blank');
-
-      alert("¡Retiro aprobado con éxito y factura generada!");
+      alert("¡Retiro aprobado con éxito!");
       closeWithdrawalModal();
       loadData();
-    }
 
-    // RECHAZAR TRANSACCIÓN
-    async function rejectTransaction(table, id) {
-      if (!confirm(`¿Seguro que deseas rechazar esta solicitud?`)) return;
+      if (playerPhone) {
+        const msg = `🧾 *COMPROBANTE DE RETIRO - GUSANOS ROYALE*\n\n` +
+                    `¡Hola *${activeWithdrawal.user}*! Tu solicitud de retiro ha sido pagada y *APROBADA*.\n\n` +
+                    `• *Monto Solicitado:* ${requested.toLocaleString('es-VE')} VES\n` +
+                    (rate > 0 ? `• *Comisión (${rate}%):* -${feeAmount.toLocaleString('es-VE')} VES\n` : '') +
+                    `• *Monto Depositado:* ${netAmount.toLocaleString('es-VE')} VES\n` +
+                    `• *Ref. Pago Móvil:* ${refNum}\n\n` +
+                    `¡Gracias por jugar en Gusanos Royale! 🚀🔥`;
 
-      const { error } = await supabaseClient
-        .from(table)
-        .update({ status: 'Rechazado' })
-        .eq('id', id);
-
-      if (error) {
-        alert("Error al rechazar: " + error.message);
-      } else {
-        alert("Solicitud rechazada.");
-        loadData();
+        const waUrl = `https://api.whatsapp.com/send?phone=${playerPhone}&text=${encodeURIComponent(msg)}`;
+        window.open(waUrl, '_blank');
       }
     }
 
-    // Cargar al iniciar
+    async function loadPromotoresData() {
+      const { data: reports } = await supabaseClient.from('promoter_reports').select('*').order('created_at', { ascending: false });
+      const body = document.getElementById('promoter-reports-table-body');
+
+      if (reports && reports.length > 0) {
+        body.innerHTML = reports.map(r => `
+          <tr>
+            <td>${r.promoter_code || 'Promotor'}</td>
+            <td>${r.user_id || 'Usuario'}</td>
+            <td style="color: #22c55e;">+${Number(r.amount || 100).toLocaleString('es-VE')} VES</td>
+            <td><span class="badge badge-${r.status || 'Pendiente'}">${r.status || 'Pendiente'}</span></td>
+            <td>
+              ${r.status === 'Pendiente' ? `
+                <button class="btn-approve" onclick="aprobarPromotorReport('${r.id}')">Aprobar Comisión</button>
+              ` : '<span style="color:#64748b;">Aprobado</span>'}
+            </td>
+          </tr>
+        `).join('');
+      } else {
+        body.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #64748b;">No hay reportes pendientes de promotores.</td></tr>`;
+      }
+    }
+
+    async function crearPromotor(e) {
+      e.preventDefault();
+      const nombre = document.getElementById('p_nombre').value.trim();
+      const cedula = document.getElementById('p_cedula').value.trim();
+      const telefono = document.getElementById('p_telefono').value.trim();
+      const correo = document.getElementById('p_correo').value.trim();
+      const codigo = document.getElementById('p_codigo').value.trim();
+
+      const { error } = await supabaseClient.from('promoters').insert([{
+        nombre, cedula, telefono, correo, codigo_promotor: codigo, created_at: new Date()
+      }]);
+
+      if (error) {
+        alert("Error al registrar promotor: " + error.message);
+      } else {
+        alert("¡Promotor registrado con éxito!");
+        document.getElementById('form-crear-promotor').reset();
+      }
+    }
+
+    async function aprobarPromotorReport(reportId) {
+      if (!confirm("¿Aprobar esta comisión para el promotor?")) return;
+      const { error } = await supabaseClient.from('promoter_reports').update({ status: 'Aprobado' }).eq('id', reportId);
+      if (error) {
+        alert("Error: " + error.message);
+      } else {
+        alert("¡Comisión aprobada con éxito!");
+        loadPromotoresData();
+      }
+    }
+
     loadData();
+    loadPromotoresData();
+    chequearEstadoBots();
   </script>
 </body>
 </html>

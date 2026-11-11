@@ -4,7 +4,6 @@
 function getSecureBalance() {
   const encoded = localStorage.getItem('secure_user_balance');
   if (!encoded) {
-    // Si no existe, creamos un saldo inicial cifrado de 5000 por defecto
     const defaultVal = 5000;
     localStorage.setItem('secure_user_balance', btoa(defaultVal.toString()));
     return defaultVal;
@@ -13,19 +12,18 @@ function getSecureBalance() {
     const decoded = parseInt(atob(encoded));
     return isNaN(decoded) ? 0 : decoded;
   } catch (e) {
-    return 0; // Si intentan corromper el código o hackearlo, se blinda a 0
+    return 0;
   }
 }
 
 function saveSecureBalance(amount) {
   const cleanAmount = Math.max(0, Math.floor(amount));
   localStorage.setItem('secure_user_balance', btoa(cleanAmount.toString()));
-  // Compatibilidad espejo por si otra parte del sistema lo lee sin cifrar
   localStorage.setItem('user_balance', cleanAmount.toString());
 }
 
 // ==========================================
-// 1. CONFIGURACIÓN MULTIJUGADOR REAL CON BOTÍN COMPARTIDO
+// 1. CONFIGURACIÓN MULTIJUGADOR REAL CON BOTS Y BOTÍN COMPARTIDO
 // ==========================================
 const WORLD_SIZE = 3000;
 const PREPARATION_TIME = 10; 
@@ -79,7 +77,6 @@ window.addEventListener('touchmove', (e) => {
   }
 }, { passive: true });
 
-// Control de Turbo en PC (Barra Espaciadora)
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') isBoosting = true;
 });
@@ -87,7 +84,6 @@ window.addEventListener('keyup', (e) => {
   if (e.code === 'Space') isBoosting = false;
 });
 
-// Control de Turbo táctil para Teléfono
 const boostBtn = document.getElementById('boost-btn');
 if (boostBtn) {
   boostBtn.addEventListener('mousedown', () => isBoosting = true);
@@ -97,14 +93,73 @@ if (boostBtn) {
 }
 
 // ==========================================
-// 2. CONEXIÓN A SUPABASE REALTIME (AISLADO POR SALA / APUESTA)
+// 2. CONEXIÓN A SUPABASE Y GESTIÓN DE BOTS (CONFIGURABLE DESDE PANEL)
 // ==========================================
 let gameRoom = null;
 const myPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
 let remotePlayers = {}; 
-let sharedLootOrbs = []; // Esferas de botín compartidas en tiempo real
+let sharedLootOrbs = []; 
+let activeBotsInRoom = []; 
+let botsEnabledMaster = false; 
 
 const roomChannelName = `arena_ves_${selectedEntryFee}`;
+
+async function verificarYCargarBots() {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+
+    const { data: configData } = await supabaseClient
+        .from('configuracion_juego')
+        .select('*');
+
+    let maestroActivo = false;
+    let cantidadBotsConfig = 6;
+    let montoBotConfig = 20.00;
+
+    if (configData) {
+        configData.forEach(item => {
+            if (item.clave === 'bots_activos') {
+                maestroActivo = (item.valor === 'true' || item.valor === true);
+            }
+            if (item.clave === 'cantidad_bots') {
+                cantidadBotsConfig = parseInt(item.valor) || 6;
+            }
+            if (item.clave === 'monto_bot_ves') {
+                montoBotConfig = parseFloat(item.valor) || 20.00;
+            }
+        });
+    }
+
+    if (maestroActivo) {
+        botsEnabledMaster = true;
+        activeBotsInRoom = [];
+        const nombresBots = ['GusanoFantasma99', 'CazaPremio_Bot', 'CyberWorm', 'TurboGusano', 'ShadowBot', 'ReyDeLaArena', 'ViperPro', 'VenomX', 'MasterWorm', 'ApexGamer'];
+
+        for (let i = 0; i < cantidadBotsConfig; i++) {
+            const bX = 500 + Math.random() * (WORLD_SIZE - 1000);
+            const bY = 500 + Math.random() * (WORLD_SIZE - 1000);
+            const botObj = {
+                id: 'bot_' + i,
+                name: nombresBots[i % nombresBots.length] + (i > 9 ? i : ''),
+                x: bX,
+                y: bY,
+                angle: Math.random() * Math.PI * 2,
+                ves: montoBotConfig,
+                radius: 14,
+                body: [],
+                length: 15,
+                skinId: 'bot',
+                alive: true
+            };
+            for (let j = 0; j < botObj.length; j++) {
+                botObj.body.push({ x: bX, y: bY });
+            }
+            activeBotsInRoom.push(botObj);
+        }
+    } else {
+        botsEnabledMaster = false;
+        activeBotsInRoom = [];
+    }
+}
 
 if (typeof supabaseClient !== 'undefined' && supabaseClient) {
   gameRoom = supabaseClient.channel(roomChannelName, {
@@ -146,7 +201,8 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
 
   gameRoom.subscribe((status) => {
     if (status === 'SUBSCRIBED') {
-      console.log(`¡Conectado a la sala aislada [${roomChannelName}] con botín sincronizado!`);
+      console.log(`¡Conectado a la sala aislada [${roomChannelName}]!`);
+      verificarYCargarBots();
     }
   });
 }
@@ -164,7 +220,7 @@ let player = {
   radius: 12,
   body: [],
   length: 20,
-  ves: selectedEntryFee, // Inicia con su apuesta base
+  ves: selectedEntryFee, 
   skinId: selectedSkin,
   alive: true
 };
@@ -205,6 +261,8 @@ let lastSendTime = 0;
 function updateLocalPlayer() {
   if (!player.alive) return;
 
+  const isPreparing = (currentPhase === 'PREPARATION');
+
   player.radius = 10 + Math.min(20, Math.sqrt(player.ves) * 0.25);
   player.length = Math.floor(15 + player.ves / (selectedEntryFee / 20));
 
@@ -234,6 +292,70 @@ function updateLocalPlayer() {
     player.body.pop();
   }
 
+  // Actualización, movimiento y colisiones de los BOTS (Solo actúan en fase COMBAT)
+  if (botsEnabledMaster && activeBotsInRoom.length > 0) {
+    activeBotsInRoom.forEach(bot => {
+      if (!bot.alive) return;
+
+      // Movimiento errante suave
+      bot.angle += (Math.random() - 0.5) * 0.4;
+      bot.x += Math.cos(bot.angle) * 2.5;
+      bot.y += Math.sin(bot.angle) * 2.5;
+
+      // Rebote en los bordes del mundo
+      if (bot.x < 50 || bot.x > WORLD_SIZE - 50) bot.angle = Math.PI - bot.angle;
+      if (bot.y < 50 || bot.y > WORLD_SIZE - 50) bot.angle = -bot.angle;
+
+      bot.body.unshift({ x: bot.x, y: bot.y });
+      if (bot.body.length > bot.length) bot.body.pop();
+
+      // Si ya pasó la preparación, aplican las colisiones de muerte
+      if (!isPreparing) {
+        // 1. SI TÚ CHOCAS CONTRA EL CUERPO DEL BOT, TE MUERES
+        for (let seg of bot.body) {
+          if (Math.hypot(player.x - seg.x, player.y - seg.y) < player.radius + 6) {
+            player.alive = false;
+            dropLootOnDeath(player.x, player.y, player.ves);
+
+            if (gameRoom) {
+              gameRoom.send({ type: 'broadcast', event: 'player_died', payload: { id: player.id } });
+            }
+            endGame(false, `Chocaste contra el cuerpo de ${bot.name}. ¡Has quedado eliminado!`);
+            return;
+          }
+        }
+
+        // 2. TÚ ELIMINAS AL BOT: Si la cabeza del bot choca contra el cuerpo de TU gusano
+        let botMurio = false;
+        for (let seg of player.body) {
+          if (Math.hypot(bot.x - seg.x, bot.y - seg.y) < bot.radius + 6) {
+            dropLootOnDeath(bot.x, bot.y, bot.ves);
+            bot.alive = false;
+            botMurio = true;
+            break;
+          }
+        }
+
+        if (botMurio) return;
+
+        // 3. COMBATE ENTRE BOTS
+        activeBotsInRoom.forEach(otherBot => {
+          if (otherBot.id !== bot.id && otherBot.alive) {
+            for (let seg of otherBot.body) {
+              if (Math.hypot(bot.x - seg.x, bot.y - seg.y) < 12) {
+                dropLootOnDeath(bot.x, bot.y, bot.ves);
+                bot.alive = false;
+              }
+            }
+          }
+        });
+      }
+    });
+
+    // Limpiar bots muertos de la memoria activa
+    activeBotsInRoom = activeBotsInRoom.filter(b => b.alive);
+  }
+
   // Recolectar botín y sumar VES en tiempo real
   for (let i = sharedLootOrbs.length - 1; i >= 0; i--) {
     const orb = sharedLootOrbs[i];
@@ -241,7 +363,7 @@ function updateLocalPlayer() {
     const dy = player.y - orb.y;
     if (Math.abs(dx) < 30 && Math.abs(dy) < 30) {
       if (Math.hypot(dx, dy) < player.radius + orb.radius + 8) {
-        player.ves += orb.ves; // Suma directa al gusanito
+        player.ves += orb.ves; 
         sharedLootOrbs.splice(i, 1);
 
         if (gameRoom) {
@@ -278,10 +400,10 @@ function updateLocalPlayer() {
 }
 
 // ==========================================
-// 4. RENDERIZADO CON MOVIMIENTO CONTINUO Y SIN SALTOS
+// 4. RENDERIZADO DE JUGADORES Y BOTS
 // ==========================================
 function drawPlayer(p, camera, isLocal = false) {
-  if (!isLocal) {
+  if (!isLocal && p.skinId !== 'bot') {
     if (p.targetAngle !== undefined) {
       if (!p.x) p.x = p.targetX;
       if (!p.y) p.y = p.targetY;
@@ -321,7 +443,10 @@ function drawPlayer(p, camera, isLocal = false) {
     const segRadius = Math.max(3, 12 * (1 - (i / p.body.length) * 0.3));
     ctx.arc(screenX, screenY, segRadius, 0, Math.PI * 2);
 
-    if (p.skinId === 've') {
+    if (p.skinId === 'bot') {
+      const coloresBot = ['#22c55e', '#a855f7', '#f97316', '#06b6d4', '#ec4899', '#eab308'];
+      ctx.fillStyle = coloresBot[i % coloresBot.length];
+    } else if (p.skinId === 've') {
       if (i % 3 === 0) ctx.fillStyle = '#ffcc00';
       else if (i % 3 === 1) ctx.fillStyle = '#00247d';
       else ctx.fillStyle = '#cf142b';
@@ -352,11 +477,10 @@ function checkRealPlayerCollisions() {
     }
   });
 
-  // Colisiones justas y precisas contra jugadores remotos
+  // Colisiones con jugadores reales
   Object.values(remotePlayers).forEach(friend => {
     if (!friend.body) return;
 
-    // 1. Revisar impacto de tu cabeza contra el cuerpo de otro gusano
     for (let seg of friend.body) {
       if (Math.hypot(player.x - seg.x, player.y - seg.y) < player.radius + 6) {
         player.alive = false;
@@ -369,20 +493,6 @@ function checkRealPlayerCollisions() {
         return;
       }
     }
-
-    // 2. Revisar choque frontal de cabezas (el que tenga menor VES o impacto directo muere)
-    if (friend.targetX !== undefined && friend.targetY !== undefined) {
-      if (Math.hypot(player.x - friend.targetX, player.y - friend.targetY) < player.radius + 10) {
-        player.alive = false;
-        dropLootOnDeath(player.x, player.y, player.ves);
-
-        if (gameRoom) {
-          gameRoom.send({ type: 'broadcast', event: 'player_died', payload: { id: player.id } });
-        }
-        endGame(false, `Choque frontal con ${friend.name}. ¡Eliminado!`);
-        return;
-      }
-    }
   });
 }
 
@@ -391,10 +501,10 @@ function updateHUD() {
   const aliveDisplay = document.getElementById('alive-display');
   const timerDisplay = document.getElementById('timer-display');
   
-  const totalConnected = Object.keys(remotePlayers).length + (player.alive ? 1 : 0);
+  const totalConnected = Object.keys(remotePlayers).length + (player.alive ? 1 : 0) + (botsEnabledMaster ? activeBotsInRoom.length : 0);
 
   if (vesDisplay) vesDisplay.innerText = `${Math.floor(player.ves).toLocaleString()} VES`;
-  if (aliveDisplay) aliveDisplay.innerText = `${totalConnected} Vivos en la Sala`;
+  if (aliveDisplay) aliveDisplay.innerText = `${totalConnected} Activos en la Sala`;
 
   const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
   const s = (timeLeft % 60).toString().padStart(2, '0');
@@ -412,13 +522,12 @@ function startTimer() {
         currentPhase = 'COMBAT';
         timeLeft = COMBAT_TIME; 
       } else {
-        endGame(true, "¡Sobreviviste a la ronda contra tus amigos! Te llevas tu botín.");
+        endGame(true, "¡Sobreviviste a la ronda! Te llevas todo tu botín recolectado.");
       }
     }
   }, 1000);
 }
 
-// Bucle de juego controlado a 60 FPS estables
 let lastTime = 0;
 const fpsInterval = 1000 / 60;
 
@@ -459,8 +568,27 @@ function gameLoop(timestamp) {
         }
       });
 
+      // Dibujar bots si están activos
+      if (botsEnabledMaster) {
+          activeBotsInRoom.forEach(bot => drawPlayer(bot, camera, false));
+      }
+
       Object.values(remotePlayers).forEach(friend => drawPlayer(friend, camera, false));
       drawPlayer(player, camera, true);
+
+      // AVISO VISUAL DE FASE DE PREPARACIÓN EN PANTALLA
+      if (currentPhase === 'PREPARATION') {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(canvas.width / 2 - 210, 30, 420, 50);
+        ctx.strokeStyle = '#eab308';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(canvas.width / 2 - 210, 30, 420, 50);
+
+        ctx.fillStyle = '#eab308';
+        ctx.font = 'bold 15px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`⏳ PREPARACIÓN: El combate inicia en ${timeLeft}s`, canvas.width / 2, 62);
+      }
 
       updateHUD();
     }
@@ -484,7 +612,6 @@ function endGame(survived, reason) {
 
   const finalAmount = survived ? Math.floor(player.ves) : 0;
 
-  // Acreditar el saldo acumulado al ganar en la cuenta global de forma segura
   if (survived) {
     let savedBalance = getSecureBalance();
     savedBalance += finalAmount;

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Promotores - Gusanos Royale</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #0f172a; color: #fff; padding: 20px; }
+        .container { max-width: 450px; margin: 40px auto; background: #1e293b; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+        h2, h3 { text-align: center; margin-bottom: 20px; }
+        label { font-size: 14px; color: #cbd5e1; }
+        input, button { width: 100%; padding: 12px; margin: 8px 0 16px 0; border-radius: 6px; border: none; box-sizing: border-box; }
+        input { background: #334155; color: #fff; font-size: 15px; }
+        button { background: #22c55e; color: #fff; font-weight: bold; font-size: 16px; cursor: pointer; }
+        button:hover { background: #16a34a; }
+        .saldo-box { background: #2563eb; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 25px; }
+        .saldo-box h1 { margin: 5px 0 0 0; font-size: 32px; }
+    </style>
+</head>
+<body>
+
+<!-- Pantalla de Login con Código -->
+<div class="container" id="login-section">
+    <h2>🔑 Acceso a Promotores</h2>
+    <label>Código de Acceso Privado:</label>
+    <input type="text" id="codigo-acceso" placeholder="Ej: PROMO-123">
+    <button onclick="loginPromotor()">Entrar al Panel</button>
+</div>
+
+<!-- Pantalla Principal del Promotor -->
+<div class="container" id="panel-section" style="display:none;">
+    <h2>¡Hola, <span id="nombre-promotor"></span>! 👋</h2>
+    
+    <div class="saldo-box">
+        <span>Comisiones Ganadas:</span>
+        <h1 id="saldo-acumulado">0.00 Bs</h1>
+    </div>
+
+    <h3>📝 Reportar Nuevo Jugador</h3>
+    <form id="form-reporte" onsubmit="enviarReporte(event)">
+        <label>Correo o Usuario del jugador:</label>
+        <input type="text" id="usuario_jugador" placeholder="Ej: pedro123" required>
+
+        <label>Monto del primer depósito (Bs):</label>
+        <input type="number" id="monto_deposito" placeholder="1000" required>
+
+        <button type="submit">Enviar a Revisión (Comisión 100 Bs)</button>
+    </form>
+    
+    <button onclick="cerrarSesion()" style="background:#ef4444; margin-top:15px;">Cerrar Sesión</button>
+</div>
+
+<script>
+    // CREDENCIALES DE SUPABASE
+    const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
+    
+    // Aquí usamos un nombre diferente para la instancia y evitar el choque
+    const dbPromotor = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let promotorActual = null;
+
+    async function loginPromotor() {
+        const codigo = document.getElementById('codigo-acceso').value.trim();
+        if (!codigo) return alert('Ingresa tu código.');
+
+        const { data, error } = await dbPromotor
+            .from('promotores')
+            .select('*')
+            .eq('codigo_acceso', codigo)
+            .single();
+
+        if (error || !data) {
+            alert('Código incorrecto o no registrado.');
+            return;
+        }
+
+        promotorActual = data;
+        document.getElementById('nombre-promotor').innerText = data.nombre;
+        document.getElementById('saldo-acumulado').innerText = data.saldo_ganado + ' Bs';
+        
+        document.getElementById('login-section').style.display = 'none';
+        document.getElementById('panel-section').style.display = 'block';
+    }
+
+    async function enviarReporte(e) {
+        e.preventDefault();
+        const usuario = document.getElementById('usuario_jugador').value.trim();
+        const monto = document.getElementById('monto_deposito').value;
+
+        const { error } = await dbPromotor
+            .from('reportes_promotores')
+            .insert([{
+                promotor_id: promotorActual.id,
+                usuario_registrado: usuario,
+                monto_deposito: monto,
+                estado: 'PENDIENTE'
+            }]);
+
+        if (error) {
+            alert('Error al enviar reporte: ' + error.message);
+        } else {
+            alert('¡Reporte enviado! El administrador verificará el depósito.');
+            document.getElementById('form-reporte').reset();
+        }
+    }
+
+    function cerrarSesion() {
+        promotorActual = null;
+        document.getElementById('login-section').style.display = 'block';
+        document.getElementById('panel-section').style.display = 'none';
+        document.getElementById('codigo-acceso').value = '';
+    }
+</script>
+
+</body>
+</html>
