@@ -75,10 +75,10 @@
     .metric-value.red { color: #ef4444; }
     .metric-value.blue { color: #38bdf8; }
 
-    /* TARJETA DE CONTROL DE BOTS AVANZADO */
+    /* TARJETA DE CONTROL DE COMIDA EN EL MAPA */
     .bots-control-card {
       background: #0b0f19;
-      border: 1px solid rgba(234, 179, 8, 0.3);
+      border: 1px solid rgba(56, 189, 248, 0.3);
       border-radius: 12px;
       padding: 20px;
       margin-bottom: 24px;
@@ -302,32 +302,32 @@
   <div class="admin-container">
     <header>
       <h1>🛡️ Panel de Administración - Gusanos Royale</h1>
-      <button onclick="loadData(); loadPromotoresData(); chequearEstadoBots();" style="background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">🔄 Actualizar Datos</button>
+      <button onclick="loadData(); loadPromotoresData(); chequearEstadoComida();" style="background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">🔄 Actualizar Datos</button>
     </header>
 
-    <!-- CONTROL DE BOTS AVANZADO -->
+    <!-- CONTROL DE COMIDA EN EL MAPA -->
     <div class="bots-control-card">
       <div style="margin-bottom: 15px;">
-        <h3 style="color: #eab308; font-size: 1.1rem; margin-bottom: 4px;">🤖 Configuración Avanzada de Bots en Salas</h3>
-        <p style="color: #94a3b8; font-size: 0.85rem;">Define la cantidad de bots y el monto de inversión/botín que soltarán en cualquier sala.</p>
+        <h3 style="color: #38bdf8; font-size: 1.1rem; margin-bottom: 4px;">🟢 Configuración de Comida y VES en el Mapa</h3>
+        <p style="color: #94a3b8; font-size: 0.85rem;">Define la cantidad de peloticas de comida repartidas y cuánto VES otorga cada una al comerla.</p>
       </div>
 
       <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center; margin-bottom: 15px;">
         <div style="flex: 1; min-width: 200px;">
-          <label style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 6px;">Cantidad de Bots</label>
-          <input type="number" id="input-num-bots" value="6" min="1" max="30" style="width: 100%; background: #030712; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; color: #fff;">
+          <label style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 6px;">Cantidad de Peloticas</label>
+          <input type="number" id="input-num-food" value="150" min="50" max="500" style="width: 100%; background: #030712; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; color: #fff;">
         </div>
         <div style="flex: 1; min-width: 200px;">
-          <label style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 6px;">Botín por Bot (VES)</label>
-          <input type="number" id="input-bot-ves" value="20" min="5" step="5" style="width: 100%; background: #030712; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; color: #fff;">
+          <label style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 6px;">Valor por Pelotica (VES)</label>
+          <input type="number" id="input-food-ves" value="10" min="1" step="1" style="width: 100%; background: #030712; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; color: #fff;">
         </div>
       </div>
 
       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-        <button id="btn-toggle-bots" onclick="alternarBotsConConfig()" style="background: #334155; color: #fff; font-weight: bold; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem; flex: 2;">
+        <button id="btn-toggle-food" onclick="alternarComidaMapa()" style="background: #334155; color: #fff; font-weight: bold; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem; flex: 2;">
           Cargando estado...
         </button>
-        <button onclick="guardarConfigBots()" style="background: #38bdf8; color: #000; font-weight: bold; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; flex: 1;">
+        <button onclick="guardarConfigComida()" style="background: #38bdf8; color: #000; font-weight: bold; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; flex: 1;">
           💾 Guardar Ajustes
         </button>
       </div>
@@ -425,7 +425,6 @@
     <div id="section-promoters" class="card" style="display: none;">
       <h2 style="font-size: 1.2rem; margin-bottom: 16px; color: #38bdf8;">💼 Módulo de Promotores y Comisiones</h2>
 
-      <!-- Formulario para Registrar Promotor -->
       <div style="background:#030712; padding:18px; border-radius:10px; border:1px solid rgba(255,255,255,0.08); margin-bottom:24px;">
         <h3 style="font-size: 1rem; margin-bottom: 12px; color: #fff;">➕ Registrar Nuevo Promotor</h3>
         <form id="form-crear-promotor" onsubmit="crearPromotor(event)" style="display:flex; flex-wrap:wrap; gap:12px;">
@@ -434,14 +433,10 @@
           <input type="text" id="p_telefono" placeholder="Teléfono" required style="flex:1 1 45%; padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#0b0f19; color:#fff;">
           <input type="email" id="p_correo" placeholder="Correo Electrónico" required style="flex:1 1 45%; padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#0b0f19; color:#fff;">
           <input type="text" id="p_codigo" placeholder="Código de Acceso Privado (ej: PROMO-César01)" required style="flex:1 1 100%; padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#0b0f19; color:#fff;">
-          
-          <button type="submit" style="background:#22c55e; color:#fff; border:none; padding:12px 20px; border-radius:6px; font-weight:bold; cursor:pointer; width:100%;">
-            Crear Cuenta de Promotor
-          </button>
+          <button type="submit" style="background:#22c55e; color:#fff; border:none; padding:12px 20px; border-radius:6px; font-weight:bold; cursor:pointer; width:100%;">Crear Cuenta de Promotor</button>
         </form>
       </div>
 
-      <!-- Tabla de Solicitudes Pendientes de Promotores -->
       <h3 style="font-size: 1rem; margin-bottom: 12px; color: #fff;">📋 Solicitudes de Comisiones por Verificar (100 Bs)</h3>
       <table>
         <thead>
@@ -470,22 +465,10 @@
       </div>
 
       <div class="modal-body-box">
-        <div class="modal-row">
-          <span style="color: #64748b;">Usuario:</span>
-          <span id="modal-dep-user" style="color: #fff; font-weight: bold;">-</span>
-        </div>
-        <div class="modal-row">
-          <span style="color: #64748b;">Método:</span>
-          <span id="modal-dep-method" style="color: #38bdf8;">-</span>
-        </div>
-        <div class="modal-row">
-          <span style="color: #64748b;">Referencia:</span>
-          <span id="modal-dep-ref" style="color: #fff;">-</span>
-        </div>
-        <div class="modal-row highlight">
-          <span>Monto Acreditado:</span>
-          <span id="modal-dep-amount" style="color: #22c55e;">0 VES</span>
-        </div>
+        <div class="modal-row"><span style="color: #64748b;">Usuario:</span><span id="modal-dep-user" style="color: #fff; font-weight: bold;">-</span></div>
+        <div class="modal-row"><span style="color: #64748b;">Método:</span><span id="modal-dep-method" style="color: #38bdf8;">-</span></div>
+        <div class="modal-row"><span style="color: #64748b;">Referencia:</span><span id="modal-dep-ref" style="color: #fff;">-</span></div>
+        <div class="modal-row highlight"><span>Monto Acreditado:</span><span id="modal-dep-amount" style="color: #22c55e;">0 VES</span></div>
       </div>
 
       <div class="modal-field">
@@ -509,26 +492,11 @@
       </div>
 
       <div class="modal-body-box">
-        <div class="modal-row">
-          <span style="color: #64748b;">Usuario:</span>
-          <span id="modal-user-display" style="color: #fff; font-weight: bold;">-</span>
-        </div>
-        <div class="modal-row">
-          <span style="color: #64748b;">Datos Pago Móvil:</span>
-          <span id="modal-account-display" style="color: #38bdf8;">-</span>
-        </div>
-        <div class="modal-row">
-          <span style="color: #64748b;">Monto Solicitado:</span>
-          <span id="modal-requested-amount" style="color: #fff;">0 VES</span>
-        </div>
-        <div class="modal-row">
-          <span style="color: #64748b;">Comisión Plataforma (<span id="modal-fee-percent">0</span>%):</span>
-          <span id="modal-fee-amount" style="color: #ef4444;">0 VES</span>
-        </div>
-        <div class="modal-row highlight">
-          <span>Monto a Depositar:</span>
-          <span id="modal-net-amount" style="color: #22c55e;">0 VES</span>
-        </div>
+        <div class="modal-row"><span style="color: #64748b;">Usuario:</span><span id="modal-user-display" style="color: #fff; font-weight: bold;">-</span></div>
+        <div class="modal-row"><span style="color: #64748b;">Datos Pago Móvil:</span><span id="modal-account-display" style="color: #38bdf8;">-</span></div>
+        <div class="modal-row"><span style="color: #64748b;">Monto Solicitado:</span><span id="modal-requested-amount" style="color: #fff;">0 VES</span></div>
+        <div class="modal-row"><span style="color: #64748b;">Comisión Plataforma (<span id="modal-fee-percent">0</span>%):</span><span id="modal-fee-amount" style="color: #ef4444;">0 VES</span></div>
+        <div class="modal-row highlight"><span>Monto a Depositar:</span><span id="modal-net-amount" style="color: #22c55e;">0 VES</span></div>
       </div>
 
       <div class="modal-field">
@@ -564,76 +532,76 @@
     let activeDeposit = null; 
 
     // ==========================================
-    // CONTROL DE BOTS Y CONFIGURACIÓN EN SALAS
+    // CONTROL DE COMIDA Y VES EN EL MAPA
     // ==========================================
-    async function chequearEstadoBots() {
+    async function chequearEstadoComida() {
         const { data } = await supabaseClient
             .from('configuracion_juego')
             .select('*')
-            .in('clave', ['bots_activos', 'cantidad_bots', 'monto_bot_ves']);
+            .in('clave', ['comida_activa', 'cantidad_comida', 'valor_comida_ves']);
         
         if (data) {
             data.forEach(item => {
-                if (item.clave === 'bots_activos') {
+                if (item.clave === 'comida_activa') {
                     const activo = (item.valor === 'true' || item.valor === true);
-                    actualizarBotonUI(activo);
+                    actualizarBotonComidaUI(activo);
                 }
-                if (item.clave === 'cantidad_bots') {
-                    document.getElementById('input-num-bots').value = item.valor;
+                if (item.clave === 'cantidad_comida') {
+                    document.getElementById('input-num-food').value = item.valor;
                 }
-                if (item.clave === 'monto_bot_ves') {
-                    document.getElementById('input-bot-ves').value = item.valor;
+                if (item.clave === 'valor_comida_ves') {
+                    document.getElementById('input-food-ves').value = item.valor;
                 }
             });
         }
     }
 
-    async function guardarConfigBots() {
-        const cant = document.getElementById('input-num-bots').value;
-        const monto = document.getElementById('input-bot-ves').value;
+    async function guardarConfigComida() {
+        const cant = document.getElementById('input-num-food').value;
+        const monto = document.getElementById('input-food-ves').value;
 
         await supabaseClient.from('configuracion_juego').upsert([
-            { clave: 'cantidad_bots', valor: String(cant) },
-            { clave: 'monto_bot_ves', valor: String(monto) }
+            { clave: 'cantidad_comida', valor: String(cant) },
+            { clave: 'valor_comida_ves', valor: String(monto) }
         ], { onConflict: 'clave' });
         
-        alert("¡Configuración de bots guardada con éxito!");
+        alert("¡Configuración de comida guardada con éxito!");
     }
 
-    async function alternarBotsConConfig() {
+    async function alternarComidaMapa() {
         const { data } = await supabaseClient
             .from('configuracion_juego')
             .select('valor')
-            .eq('clave', 'bots_activos')
+            .eq('clave', 'comida_activa')
             .single();
 
         const estadoActual = data ? (data.valor === 'true' || data.valor === true) : false;
         const nuevoEstado = !estadoActual;
 
         await supabaseClient.from('configuracion_juego').upsert({ 
-            clave: 'bots_activos', 
+            clave: 'comida_activa', 
             valor: String(nuevoEstado) 
         }, { onConflict: 'clave' });
 
-        await guardarConfigBots();
-        actualizarBotonUI(nuevoEstado);
-        alert(nuevoEstado ? '🟢 ¡Bots ACTIVOS y configurados en las salas!' : '🔴 Bots DESACTIVADOS.');
+        await guardarConfigComida();
+        actualizarBotonComidaUI(nuevoEstado);
+        alert(nuevoEstado ? '🟢 ¡Comida activa en el mapa!' : '🔴 Comida desactivada.');
     }
 
-    function actualizarBotonUI(activo) {
-        const btn = document.getElementById('btn-toggle-bots');
+    function actualizarBotonComidaUI(activo) {
+        const btn = document.getElementById('btn-toggle-food');
         if (activo) {
-            btn.innerText = '🟢 Bots ACTIVOS (Clic para Apagar)';
+            btn.innerText = '🟢 Comida ACTIVA (Clic para Apagar)';
             btn.style.background = '#22c55e';
             btn.style.color = '#000';
         } else {
-            btn.innerText = '🔴 Bots APAGADOS (Clic para Activar)';
+            btn.innerText = '🔴 Comida APAGADA (Clic para Activar)';
             btn.style.background = '#ef4444';
             btn.style.color = '#fff';
         }
     }
 
-    chequearEstadoBots();
+    chequearEstadoComida();
 
     function switchTab(type, btnElement) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1095,7 +1063,7 @@
 
     loadData();
     loadPromotoresData();
-    chequearEstadoBots();
+    chequearEstadoComida();
   </script>
 </body>
 </html>

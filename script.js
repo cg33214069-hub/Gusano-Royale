@@ -23,7 +23,7 @@ function saveSecureBalance(amount) {
 }
 
 // ==========================================
-// 1. CONFIGURACIÓN MULTIJUGADOR REAL CON BOTS Y BOTÍN COMPARTIDO
+// 1. CONFIGURACIÓN DEL MUNDO Y COMIDA EN EL MAPA
 // ==========================================
 const WORLD_SIZE = 3000;
 const PREPARATION_TIME = 10; 
@@ -53,9 +53,7 @@ let currentPhase = 'PREPARATION';
 let timeLeft = PREPARATION_TIME;
 let timerInterval = null;
 
-// ==========================================
-// CORRECCIÓN DE SALDO SEGURO: Descontar apuesta al entrar
-// ==========================================
+// Descontar apuesta al entrar
 let currentBalance = getSecureBalance();
 if (currentBalance >= selectedEntryFee) {
   currentBalance -= selectedEntryFee;
@@ -93,71 +91,55 @@ if (boostBtn) {
 }
 
 // ==========================================
-// 2. CONEXIÓN A SUPABASE Y GESTIÓN DE BOTS (CONFIGURABLE DESDE PANEL)
+// 2. CONEXIÓN A SUPABASE Y CARGA DE COMIDA
 // ==========================================
 let gameRoom = null;
 const myPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
 let remotePlayers = {}; 
 let sharedLootOrbs = []; 
-let activeBotsInRoom = []; 
-let botsEnabledMaster = false; 
+
+// Variables de Configuración de Comida (Controladas desde Supabase / Admin)
+let mapaComidaActiva = true;
+let cantidadComidaConfig = 150;
+let valorComidaConfig = 10.00;
+let arenaFoodOrbs = []; 
 
 const roomChannelName = `arena_ves_${selectedEntryFee}`;
 
-async function verificarYCargarBots() {
+async function verificarYCargarComida() {
     if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
 
     const { data: configData } = await supabaseClient
         .from('configuracion_juego')
         .select('*');
 
-    let maestroActivo = false;
-    let cantidadBotsConfig = 6;
-    let montoBotConfig = 20.00;
-
     if (configData) {
         configData.forEach(item => {
-            if (item.clave === 'bots_activos') {
-                maestroActivo = (item.valor === 'true' || item.valor === true);
+            if (item.clave === 'comida_activa') {
+                mapaComidaActiva = (item.valor === 'true' || item.valor === true);
             }
-            if (item.clave === 'cantidad_bots') {
-                cantidadBotsConfig = parseInt(item.valor) || 6;
+            if (item.clave === 'cantidad_comida') {
+                cantidadComidaConfig = parseInt(item.valor) || 150;
             }
-            if (item.clave === 'monto_bot_ves') {
-                montoBotConfig = parseFloat(item.valor) || 20.00;
+            if (item.clave === 'valor_comida_ves') {
+                valorComidaConfig = parseFloat(item.valor) || 10.00;
             }
         });
     }
 
-    if (maestroActivo) {
-        botsEnabledMaster = true;
-        activeBotsInRoom = [];
-        const nombresBots = ['GusanoFantasma99', 'CazaPremio_Bot', 'CyberWorm', 'TurboGusano', 'ShadowBot', 'ReyDeLaArena', 'ViperPro', 'VenomX', 'MasterWorm', 'ApexGamer'];
-
-        for (let i = 0; i < cantidadBotsConfig; i++) {
-            const bX = 500 + Math.random() * (WORLD_SIZE - 1000);
-            const bY = 500 + Math.random() * (WORLD_SIZE - 1000);
-            const botObj = {
-                id: 'bot_' + i,
-                name: nombresBots[i % nombresBots.length] + (i > 9 ? i : ''),
-                x: bX,
-                y: bY,
-                angle: Math.random() * Math.PI * 2,
-                ves: montoBotConfig,
-                radius: 14,
-                body: [],
-                length: 15,
-                skinId: 'bot',
-                alive: true
-            };
-            for (let j = 0; j < botObj.length; j++) {
-                botObj.body.push({ x: bX, y: bY });
-            }
-            activeBotsInRoom.push(botObj);
+    if (mapaComidaActiva) {
+        arenaFoodOrbs = [];
+        for (let i = 0; i < cantidadComidaConfig; i++) {
+            arenaFoodOrbs.push({
+                x: Math.random() * (WORLD_SIZE - 200) + 100,
+                y: Math.random() * (WORLD_SIZE - 200) + 100,
+                ves: valorComidaConfig,
+                radius: 5,
+                color: valorComidaConfig > 50 ? '#4ade80' : '#38bdf8'
+            });
         }
     } else {
-        botsEnabledMaster = false;
-        activeBotsInRoom = [];
+        arenaFoodOrbs = [];
     }
 }
 
@@ -202,13 +184,13 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
   gameRoom.subscribe((status) => {
     if (status === 'SUBSCRIBED') {
       console.log(`¡Conectado a la sala aislada [${roomChannelName}]!`);
-      verificarYCargarBots();
+      verificarYCargarComida();
     }
   });
 }
 
 // ==========================================
-// 3. JUGADOR LOCAL Y BUCLE DE TRANSMISIÓN
+// 3. JUGADOR LOCAL Y BUCLE DE JUEGO
 // ==========================================
 let player = {
   id: myPlayerId,
@@ -261,8 +243,6 @@ let lastSendTime = 0;
 function updateLocalPlayer() {
   if (!player.alive) return;
 
-  const isPreparing = (currentPhase === 'PREPARATION');
-
   player.radius = 10 + Math.min(20, Math.sqrt(player.ves) * 0.25);
   player.length = Math.floor(15 + player.ves / (selectedEntryFee / 20));
 
@@ -292,71 +272,27 @@ function updateLocalPlayer() {
     player.body.pop();
   }
 
-  // Actualización, movimiento y colisiones de los BOTS (Solo actúan en fase COMBAT)
-  if (botsEnabledMaster && activeBotsInRoom.length > 0) {
-    activeBotsInRoom.forEach(bot => {
-      if (!bot.alive) return;
+  // RECOLECTAR COMIDA DEL MAPA Y ACUMULAR VES
+  if (mapaComidaActiva && arenaFoodOrbs.length > 0) {
+    for (let i = arenaFoodOrbs.length - 1; i >= 0; i--) {
+      const food = arenaFoodOrbs[i];
+      const dx = player.x - food.x;
+      const dy = player.y - food.y;
 
-      // Movimiento errante suave
-      bot.angle += (Math.random() - 0.5) * 0.4;
-      bot.x += Math.cos(bot.angle) * 2.5;
-      bot.y += Math.sin(bot.angle) * 2.5;
+      if (Math.abs(dx) < 30 && Math.abs(dy) < 30) {
+        if (Math.hypot(dx, dy) < player.radius + food.radius + 4) {
+          player.ves += food.ves; // Suma VES y crece en tiempo real
 
-      // Rebote en los bordes del mundo
-      if (bot.x < 50 || bot.x > WORLD_SIZE - 50) bot.angle = Math.PI - bot.angle;
-      if (bot.y < 50 || bot.y > WORLD_SIZE - 50) bot.angle = -bot.angle;
-
-      bot.body.unshift({ x: bot.x, y: bot.y });
-      if (bot.body.length > bot.length) bot.body.pop();
-
-      // Si ya pasó la preparación, aplican las colisiones de muerte
-      if (!isPreparing) {
-        // 1. SI TÚ CHOCAS CONTRA EL CUERPO DEL BOT, TE MUERES
-        for (let seg of bot.body) {
-          if (Math.hypot(player.x - seg.x, player.y - seg.y) < player.radius + 6) {
-            player.alive = false;
-            dropLootOnDeath(player.x, player.y, player.ves);
-
-            if (gameRoom) {
-              gameRoom.send({ type: 'broadcast', event: 'player_died', payload: { id: player.id } });
-            }
-            endGame(false, `Chocaste contra el cuerpo de ${bot.name}. ¡Has quedado eliminado!`);
-            return;
-          }
+          // Reubicar la comida para mantener el mapa lleno
+          food.x = Math.random() * (WORLD_SIZE - 200) + 100;
+          food.y = Math.random() * (WORLD_SIZE - 200) + 100;
+          food.ves = valorComidaConfig;
         }
-
-        // 2. TÚ ELIMINAS AL BOT: Si la cabeza del bot choca contra el cuerpo de TU gusano
-        let botMurio = false;
-        for (let seg of player.body) {
-          if (Math.hypot(bot.x - seg.x, bot.y - seg.y) < bot.radius + 6) {
-            dropLootOnDeath(bot.x, bot.y, bot.ves);
-            bot.alive = false;
-            botMurio = true;
-            break;
-          }
-        }
-
-        if (botMurio) return;
-
-        // 3. COMBATE ENTRE BOTS
-        activeBotsInRoom.forEach(otherBot => {
-          if (otherBot.id !== bot.id && otherBot.alive) {
-            for (let seg of otherBot.body) {
-              if (Math.hypot(bot.x - seg.x, bot.y - seg.y) < 12) {
-                dropLootOnDeath(bot.x, bot.y, bot.ves);
-                bot.alive = false;
-              }
-            }
-          }
-        });
       }
-    });
-
-    // Limpiar bots muertos de la memoria activa
-    activeBotsInRoom = activeBotsInRoom.filter(b => b.alive);
+    }
   }
 
-  // Recolectar botín y sumar VES en tiempo real
+  // Recolectar botín de orbes compartidos
   for (let i = sharedLootOrbs.length - 1; i >= 0; i--) {
     const orb = sharedLootOrbs[i];
     const dx = player.x - orb.x;
@@ -400,10 +336,10 @@ function updateLocalPlayer() {
 }
 
 // ==========================================
-// 4. RENDERIZADO DE JUGADORES Y BOTS
+// 4. RENDERIZADO
 // ==========================================
 function drawPlayer(p, camera, isLocal = false) {
-  if (!isLocal && p.skinId !== 'bot') {
+  if (!isLocal) {
     if (p.targetAngle !== undefined) {
       if (!p.x) p.x = p.targetX;
       if (!p.y) p.y = p.targetY;
@@ -443,10 +379,7 @@ function drawPlayer(p, camera, isLocal = false) {
     const segRadius = Math.max(3, 12 * (1 - (i / p.body.length) * 0.3));
     ctx.arc(screenX, screenY, segRadius, 0, Math.PI * 2);
 
-    if (p.skinId === 'bot') {
-      const coloresBot = ['#22c55e', '#a855f7', '#f97316', '#06b6d4', '#ec4899', '#eab308'];
-      ctx.fillStyle = coloresBot[i % coloresBot.length];
-    } else if (p.skinId === 've') {
+    if (p.skinId === 've') {
       if (i % 3 === 0) ctx.fillStyle = '#ffcc00';
       else if (i % 3 === 1) ctx.fillStyle = '#00247d';
       else ctx.fillStyle = '#cf142b';
@@ -477,7 +410,6 @@ function checkRealPlayerCollisions() {
     }
   });
 
-  // Colisiones con jugadores reales
   Object.values(remotePlayers).forEach(friend => {
     if (!friend.body) return;
 
@@ -501,7 +433,7 @@ function updateHUD() {
   const aliveDisplay = document.getElementById('alive-display');
   const timerDisplay = document.getElementById('timer-display');
   
-  const totalConnected = Object.keys(remotePlayers).length + (player.alive ? 1 : 0) + (botsEnabledMaster ? activeBotsInRoom.length : 0);
+  const totalConnected = Object.keys(remotePlayers).length + (player.alive ? 1 : 0);
 
   if (vesDisplay) vesDisplay.innerText = `${Math.floor(player.ves).toLocaleString()} VES`;
   if (aliveDisplay) aliveDisplay.innerText = `${totalConnected} Activos en la Sala`;
@@ -557,6 +489,20 @@ function gameLoop(timestamp) {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
       }
 
+      // Dibujar comida repartida en el mapa
+      if (mapaComidaActiva) {
+        arenaFoodOrbs.forEach(food => {
+          const sx = food.x - camera.x;
+          const sy = food.y - camera.y;
+          if (sx >= -20 && sx <= canvas.width + 20 && sy >= -20 && sy <= canvas.height + 20) {
+            ctx.beginPath();
+            ctx.arc(sx, sy, food.radius, 0, Math.PI * 2);
+            ctx.fillStyle = food.color;
+            ctx.fill();
+          }
+        });
+      }
+
       sharedLootOrbs.forEach(orb => {
         const sx = orb.x - camera.x;
         const sy = orb.y - camera.y;
@@ -568,15 +514,9 @@ function gameLoop(timestamp) {
         }
       });
 
-      // Dibujar bots si están activos
-      if (botsEnabledMaster) {
-          activeBotsInRoom.forEach(bot => drawPlayer(bot, camera, false));
-      }
-
       Object.values(remotePlayers).forEach(friend => drawPlayer(friend, camera, false));
       drawPlayer(player, camera, true);
 
-      // AVISO VISUAL DE FASE DE PREPARACIÓN EN PANTALLA
       if (currentPhase === 'PREPARATION') {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(canvas.width / 2 - 210, 30, 420, 50);
