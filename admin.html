@@ -857,12 +857,19 @@
       }
     }
 
+    // ABRIR MODAL DE DEPÓSITO
     function openDepositModal(depositId, userName, amount, method, reference, userPhone) {
-      activeDeposit = { id: depositId, user: userName, amount: amount, method: method, reference: reference };
+      activeDeposit = { 
+        id: depositId, 
+        user: userName, 
+        amount: amount, 
+        method: method, 
+        reference: reference 
+      };
       
-      document.getElementById('modal-dep-user').innerText = userName;
-      document.getElementById('modal-dep-method').innerText = method;
-      document.getElementById('modal-dep-ref').innerText = reference;
+      document.getElementById('modal-dep-user').innerText = userName || 'Usuario';
+      document.getElementById('modal-dep-method').innerText = method || 'Pago';
+      document.getElementById('modal-dep-ref').innerText = reference || 'N/A';
       document.getElementById('modal-dep-amount').innerText = `${Number(amount).toLocaleString('es-VE')} VES`;
       document.getElementById('input-dep-phone').value = userPhone || '';
 
@@ -874,15 +881,20 @@
       activeDeposit = null;
     }
 
+    // CONFIRMAR DEPÓSITO Y ENVIAR FACTURA POR WHATSAPP
     async function confirmDepositAndSendInvoice() {
-      if (!activeDeposit) return;
+      if (!activeDeposit) {
+        alert("Error: No hay ningún depósito activo seleccionado.");
+        return;
+      }
 
+      const currentDep = { ...activeDeposit };
       const playerPhone = document.getElementById('input-dep-phone').value.trim();
 
       const { error: depError } = await supabaseClient
         .from('deposits')
         .update({ status: 'Aprobado' })
-        .eq('id', activeDeposit.id);
+        .eq('id', currentDep.id);
 
       if (depError) {
         alert("Error al aprobar depósito: " + depError.message);
@@ -892,7 +904,7 @@
       const { data: depRecord } = await supabaseClient
         .from('deposits')
         .select('user_id, amount')
-        .eq('id', activeDeposit.id)
+        .eq('id', currentDep.id)
         .single();
 
       if (depRecord) {
@@ -927,10 +939,10 @@
 
       if (playerPhone) {
         const msg = `🧾 *FACTURA / RECIBO DE PAGO - GUSANOS ROYALE*\n\n` +
-                    `¡Hola *${activeDeposit.user}*! Tu depósito ha sido *APROBADO* exitosamente.\n\n` +
-                    `• *Método:* ${activeDeposit.method}\n` +
-                    `• *Referencia:* ${activeDeposit.reference}\n` +
-                    `• *Monto Acreditado:* ${Number(activeDeposit.amount).toLocaleString('es-VE')} VES\n\n` +
+                    `¡Hola *${currentDep.user}*! Tu depósito ha sido *APROBADO* exitosamente.\n\n` +
+                    `• *Método:* ${currentDep.method}\n` +
+                    `• *Referencia:* ${currentDep.reference}\n` +
+                    `• *Monto Acreditado:* ${Number(currentDep.amount).toLocaleString('es-VE')} VES\n\n` +
                     `¡Ya puedes entrar a la plataforma y disfrutar de las salas de juego! 🚀🎮`;
         
         const waUrl = `https://api.whatsapp.com/send?phone=${playerPhone}&text=${encodeURIComponent(msg)}`;
@@ -938,11 +950,17 @@
       }
     }
 
+    // ABRIR MODAL DE RETIRO
     function openWithdrawalModal(withdrawalId, userName, amount, accountDetails, userPhone) {
-      activeWithdrawal = { id: withdrawalId, user: userName, amount: amount, account: accountDetails };
+      activeWithdrawal = { 
+        id: withdrawalId, 
+        user: userName, 
+        amount: amount, 
+        account: accountDetails 
+      };
 
-      document.getElementById('modal-user-display').innerText = userName;
-      document.getElementById('modal-account-display').innerText = accountDetails;
+      document.getElementById('modal-user-display').innerText = userName || 'Usuario';
+      document.getElementById('modal-account-display').innerText = accountDetails || 'N/A';
       document.getElementById('modal-requested-amount').innerText = `${Number(amount).toLocaleString('es-VE')} VES`;
       
       document.getElementById('input-commission-rate').value = 0;
@@ -971,9 +989,14 @@
       document.getElementById('modal-net-amount').innerText = `${netAmount.toLocaleString('es-VE')} VES`;
     }
 
+    // CONFIRMAR RETIRO Y ENVIAR FACTURA POR WHATSAPP
     async function confirmWithdrawalAndSendInvoice() {
-      if (!activeWithdrawal) return;
+      if (!activeWithdrawal) {
+        alert("Error: No hay ninguna solicitud de retiro activa seleccionada.");
+        return;
+      }
 
+      const currentWith = { ...activeWithdrawal };
       const refNum = document.getElementById('input-bank-reference').value.trim();
       const playerPhone = document.getElementById('input-user-phone').value.trim();
       const rate = Number(document.getElementById('input-commission-rate').value) || 0;
@@ -983,14 +1006,14 @@
         return;
       }
 
-      const requested = Number(activeWithdrawal.amount);
+      const requested = Number(currentWith.amount);
       const feeAmount = (requested * rate) / 100;
       const netAmount = requested - feeAmount;
 
       const { error } = await supabaseClient
         .from('withdrawals')
         .update({ status: 'Aprobado' })
-        .eq('id', activeWithdrawal.id);
+        .eq('id', currentWith.id);
 
       if (error) {
         alert("Error al procesar el retiro: " + error.message);
@@ -1003,7 +1026,7 @@
 
       if (playerPhone) {
         const msg = `🧾 *COMPROBANTE DE RETIRO - GUSANOS ROYALE*\n\n` +
-                    `¡Hola *${activeWithdrawal.user}*! Tu solicitud de retiro ha sido pagada y *APROBADA*.\n\n` +
+                    `¡Hola *${currentWith.user}*! Tu solicitud de retiro ha sido pagada y *APROBADA*.\n\n` +
                     `• *Monto Solicitado:* ${requested.toLocaleString('es-VE')} VES\n` +
                     (rate > 0 ? `• *Comisión (${rate}%):* -${feeAmount.toLocaleString('es-VE')} VES\n` : '') +
                     `• *Monto Depositado:* ${netAmount.toLocaleString('es-VE')} VES\n` +
@@ -1015,6 +1038,7 @@
       }
     }
 
+    // GESTIÓN DE PROMOTORES
     async function loadPromotoresData() {
       const { data: reports } = await supabaseClient.from('promoter_reports').select('*').order('created_at', { ascending: false });
       const body = document.getElementById('promoter-reports-table-body');
