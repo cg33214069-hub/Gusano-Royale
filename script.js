@@ -620,9 +620,9 @@ async function endGame(survived, reason) {
             .eq('id', profile.id);
 
           if (errUpdate) {
-            console.error("Error al actualizar la ganancia en Supabase:", errUpdate.message);
+            console.error("❌ Error al actualizar la ganancia en Supabase:", errUpdate.message);
           } else {
-            console.log("¡Ganancia acreditada con éxito en Supabase!");
+            console.log("✅ ¡Ganancia acreditada con éxito en Supabase!");
           }
         }
       }
