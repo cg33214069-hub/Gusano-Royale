@@ -192,6 +192,29 @@
       });
     }
 
+    // ==========================================
+    // NOTIFICACIÓN PUSH INSTANTÁNEA VÍA NTFY.SH
+    // ==========================================
+    async function notificarRegistroNtfy(fullname, username, phone, email) {
+      const CANAL_SECRETO = 'gusanoroyal2026';
+
+      const mensaje = `Nombre: ${fullname}\nApodo: ${username}\nTelefono: ${phone}\nCorreo: ${email}\nHora: ${new Date().toLocaleString('es-VE')}`;
+
+      try {
+        await fetch(`https://ntfy.sh/${CANAL_SECRETO}`, {
+          method: 'POST',
+          headers: {
+            'Title': 'Nuevo Registro en Gusanos Royale!',
+            'Priority': 'high',
+            'Tags': 'video_game,money_with_wings'
+          },
+          body: mensaje
+        });
+      } catch (error) {
+        console.error('Error enviando notificación a ntfy:', error);
+      }
+    }
+
     // Inicialización segura de Supabase global
     const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
@@ -291,6 +314,9 @@
               throw profileError;
             }
           }
+
+          // ENVIAR NOTIFICACIÓN AL TELÉFONO ANTES DE MOSTRAR EL MENSAJE DE ÉXITO
+          await notificarRegistroNtfy(fullname, username, phone, email);
 
           alert("¡Registro exitoso! Ya puedes iniciar sesión con tus datos.");
           toggleMode();
