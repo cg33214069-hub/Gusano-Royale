@@ -27,7 +27,7 @@ function saveSecureBalance(amount) {
 // ==========================================
 const WORLD_SIZE = 3000;
 const PREPARATION_TIME = 10; 
-const COMBAT_TIME = 60;       
+const COMBAT_TIME = 60;      
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -53,12 +53,41 @@ let currentPhase = 'PREPARATION';
 let timeLeft = PREPARATION_TIME;
 let timerInterval = null;
 
-// Descontar apuesta al entrar
-let currentBalance = getSecureBalance();
-if (currentBalance >= selectedEntryFee) {
-  currentBalance -= selectedEntryFee;
-  saveSecureBalance(currentBalance);
+// ==========================================
+// DESCUENTO AUTOMÁTICO Y SEGURO DE LA ENTRADA EN SUPABASE
+// ==========================================
+async function descontarEntradaEnSupabase() {
+  if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+
+  const userId = localStorage.getItem('user_id');
+  const userEmail = localStorage.getItem('user_email');
+
+  if (!userId && !userEmail) return;
+
+  let query = supabaseClient.from('profiles').select('id, balance');
+  if (userId) {
+    query = query.eq('id', userId);
+  } else {
+    query = query.eq('email', userEmail);
+  }
+
+  const { data: profile, error } = await query.maybeSingle();
+  if (error || !profile) return;
+
+  const saldoActual = Number(profile.balance || 0);
+  if (saldoActual >= selectedEntryFee) {
+    const nuevoSaldo = saldoActual - selectedEntryFee;
+    
+    await supabaseClient
+      .from('profiles')
+      .update({ balance: nuevoSaldo })
+      .eq('id', profile.id);
+
+    saveSecureBalance(nuevoSaldo);
+  }
 }
+
+descontarEntradaEnSupabase();
 
 const mouse = { x: canvas.width / 2, y: canvas.height / 2 };
 let isBoosting = false;
@@ -98,7 +127,6 @@ const myPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
 let remotePlayers = {}; 
 let sharedLootOrbs = []; 
 
-// Variables de Configuración de Comida (Controladas desde Supabase / Admin)
 let mapaComidaActiva = true;
 let cantidadComidaConfig = 150;
 let valorComidaConfig = 10.00;
@@ -272,7 +300,6 @@ function updateLocalPlayer() {
     player.body.pop();
   }
 
-  // RECOLECTAR COMIDA DEL MAPA Y ACUMULAR VES
   if (mapaComidaActiva && arenaFoodOrbs.length > 0) {
     for (let i = arenaFoodOrbs.length - 1; i >= 0; i--) {
       const food = arenaFoodOrbs[i];
@@ -281,9 +308,8 @@ function updateLocalPlayer() {
 
       if (Math.abs(dx) < 30 && Math.abs(dy) < 30) {
         if (Math.hypot(dx, dy) < player.radius + food.radius + 4) {
-          player.ves += food.ves; // Suma VES y crece en tiempo real
+          player.ves += food.ves; 
 
-          // Reubicar la comida para mantener el mapa lleno
           food.x = Math.random() * (WORLD_SIZE - 200) + 100;
           food.y = Math.random() * (WORLD_SIZE - 200) + 100;
           food.ves = valorComidaConfig;
@@ -292,7 +318,6 @@ function updateLocalPlayer() {
     }
   }
 
-  // Recolectar botín de orbes compartidos
   for (let i = sharedLootOrbs.length - 1; i >= 0; i--) {
     const orb = sharedLootOrbs[i];
     const dx = player.x - orb.x;
@@ -489,7 +514,6 @@ function gameLoop(timestamp) {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
       }
 
-      // Dibujar comida repartida en el mapa
       if (mapaComidaActiva) {
         arenaFoodOrbs.forEach(food => {
           const sx = food.x - camera.x;

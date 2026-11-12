@@ -800,26 +800,61 @@
       canalesSalas[salaId] = canal;
     });
 
-    // Función al seleccionar una sala para jugar
-    function unirseASala(salaId, costoEntrada) {
+    // --- FUNCIÓN SEGURA PARA UNIRSE A UNA SALA Y DESCONTAR LA ENTRADA ---
+    async function unirseASala(salaId, costoEntrada) {
+      const userId = localStorage.getItem('user_id');
+      const userEmail = localStorage.getItem('user_email');
+
+      if (!userId && !userEmail) {
+        alert("⚠️ Debes iniciar sesión para entrar a una sala de apuestas.");
+        window.location.href = 'index.html';
+        return;
+      }
+
+      // 1. Consultar saldo real directo de Supabase para evitar trampas
+      let query = supabaseClient.from('profiles').select('id, balance');
+      if (userId) {
+        query = query.eq('id', userId);
+      } else {
+        query = query.eq('email', userEmail);
+      }
+
+      const { data: profile, error } = await query.maybeSingle();
+
+      if (error || !profile) {
+        alert("Error al verificar tu saldo en el servidor.");
+        return;
+      }
+
+      const saldoActual = Number(profile.balance || 0);
+
+      // 2. Validar si tiene suficiente dinero para la entrada
+      if (saldoActual < costoEntrada) {
+        alert(`❌ Saldo insuficiente.\n\nNecesitas ${costoEntrada.toLocaleString('es-VE')} VES para entrar a esta sala y tu saldo actual es de ${saldoActual.toLocaleString('es-VE')} VES.\n\nPor favor ve a la pestaña "Depositar" para recargar.`);
+        switchTab('deposit', null);
+        return;
+      }
+
+      // 3. Descontar la entrada del saldo del usuario
+      const nuevoSaldo = saldoActual - costoEntrada;
+
+      const { error: updateErr } = await supabaseClient
+        .from('profiles')
+        .update({ balance: nuevoSaldo })
+        .eq('id', profile.id);
+
+      if (updateErr) {
+        alert("Error al descontar la entrada: " + updateErr.message);
+        return;
+      }
+
+      // 4. Actualizar visualmente y en localStorage, y entrar a la arena
+      localStorage.setItem('user_balance', nuevoSaldo);
       localStorage.setItem('selected_room', salaId);
       localStorage.setItem('selected_entry', costoEntrada);
-      window.location.href = 'game.html';
-    }
-    // --- BOTÓN DE COPIAR RÁPIDO ---
-    function copiarDato(textoACopiar, botonElemento) {
-      navigator.clipboard.writeText(textoACopiar).then(() => {
-        const textoOriginal = botonElemento.innerHTML;
-        botonElemento.innerHTML = '✅ ¡Copiado!';
-        botonElemento.style.backgroundColor = '#16a34a';
 
-        setTimeout(() => {
-          botonElemento.innerHTML = textoOriginal;
-          botonElemento.style.backgroundColor = '';
-        }, 1800);
-      }).catch(() => {
-        alert('Copia manual: ' + textoACopiar);
-      });
+      alert(`✅ ¡Entrada pagada con éxito!\n\nSe te han descontado ${costoEntrada.toLocaleString('es-VE')} VES de tu saldo. ¡A sobrevivir!`);
+      window.location.href = 'game.html';
     }
 
     // LISTADO DE 100 SKINS / DISEÑOS DE GUSANOS
