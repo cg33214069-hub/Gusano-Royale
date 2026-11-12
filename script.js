@@ -563,7 +563,10 @@ gameActive = true;
 startTimer();
 requestAnimationFrame(gameLoop);
 
-function endGame(survived, reason) {
+// ==========================================
+// FUNCIÓN CORREGIDA PARA GUARDAR EL PREMIO EN SUPABASE
+// ==========================================
+async function endGame(survived, reason) {
   gameActive = false;
   clearInterval(timerInterval);
 
@@ -576,24 +579,51 @@ function endGame(survived, reason) {
 
   const finalAmount = survived ? Math.floor(player.ves) : 0;
 
-  if (survived) {
+  if (survived && finalAmount > 0) {
+    // 1. Guardamos localmente con el sistema seguro
     let savedBalance = getSecureBalance();
     savedBalance += finalAmount;
     saveSecureBalance(savedBalance);
 
-    if (typeof addPlayerBalance === 'function') {
-      addPlayerBalance(finalAmount);
+    // 2. ACTUALIZAMOS DIRECTAMENTE EL SALDO EN LA BASE DE DATOS DE SUPABASE
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      const userId = localStorage.getItem('user_id');
+      const userEmail = localStorage.getItem('user_email');
+
+      if (userId || userEmail) {
+        let query = supabaseClient.from('profiles').select('id, balance');
+        if (userId) {
+          query = query.eq('id', userId);
+        } else {
+          query = query.eq('email', userEmail);
+        }
+
+        const { data: profile, error: errFetch } = await query.maybeSingle();
+
+        if (!errFetch && profile) {
+          const balanceActualServidor = Number(profile.balance || 0);
+          const nuevoBalanceServidor = balanceActualServidor + finalAmount;
+
+          const { error: errUpdate } = await supabaseClient
+            .from('profiles')
+            .update({ balance: nuevoBalanceServidor })
+            .eq('id', profile.id);
+
+          if (errUpdate) {
+            console.error("Error al actualizar la ganancia en Supabase:", errUpdate.message);
+          } else {
+            console.log("¡Ganancia acreditada con éxito en Supabase!");
+          }
+        }
+      }
     }
   }
 
-  if (survived && typeof finishGameAndReward === 'function') {
-    finishGameAndReward(finalAmount);
-  }
-
+  // Si sobrevive o muere, actualizamos los textos del modal
   if (survived) {
     if (endTitle) { endTitle.innerText = "¡VICTORIA REAL!"; endTitle.style.color = "#4ade80"; }
     if (endDesc) endDesc.innerText = reason;
-    if (endVes) endVes.innerText = `${finalAmount.toLocaleString()} VES`;
+    if (endVes) endVes.innerText = `${finalAmount.toLocaleString('es-VE')} VES`;
   } else {
     if (endTitle) { endTitle.innerText = "ELIMINADO"; endTitle.style.color = "#ef4444"; }
     if (endDesc) endDesc.innerText = reason;
