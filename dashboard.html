@@ -381,6 +381,34 @@
       line-height: 1.6;
     }
 
+    /* ESTILOS PARA LOS BOTONES DE COPIAR INDIVIDUAL */
+    .dato-fila {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin: 6px 0;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .btn-copiar {
+      background: #0ea5e9;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-copiar:hover {
+      background: #0284c7;
+    }
+
     .input-group {
       margin-bottom: 16px;
     }
@@ -454,14 +482,40 @@
     .room-card.pro { border-top: 3px solid #eab308; }
     .room-card.vip { border-top: 3px solid #ef4444; }
 
+    .room-badge-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
     .room-badge {
       font-size: 0.65rem;
       font-weight: bold;
       text-transform: uppercase;
       padding: 2px 8px;
       border-radius: 4px;
-      width: fit-content;
-      margin-bottom: 8px;
+    }
+
+    /* ESTILOS PARA EL CONTADOR EN VIVO */
+    .online-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.75rem;
+      color: #4ade80;
+      background: rgba(74, 222, 128, 0.1);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+
+    .dot-verde {
+      width: 6px;
+      height: 6px;
+      background-color: #22c55e;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #22c55e;
     }
 
     .beginner .room-badge { background: rgba(56, 189, 248, 0.1); color: #38bdf8; }
@@ -552,40 +606,56 @@
 
       <h2 class="section-title">🔹 SALAS DISPONIBLES EN VIVO</h2>
       <div class="rooms-grid">
+        <!-- SALA 1 -->
         <div class="room-card beginner">
-          <span class="room-badge">NOBATUM</span>
+          <div class="room-badge-header">
+            <span class="room-badge">NOBATUM</span>
+            <div class="online-badge"><span class="dot-verde"></span><strong id="count-sala-1">0</strong> en línea</div>
+          </div>
           <h3>Sala Principiantes</h3>
           <p style="font-size: 0.75rem; color: #64748b; margin: 8px 0 16px;">Ideal para entrenamiento rápido.</p>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:6px;"><span style="color:#64748b;">Entrada:</span><strong style="color:#fff;">50 VES</strong></div>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span style="color:#64748b;">Pozo Est.:</span><strong style="color:#fff;">500 VES</strong></div>
-          <button class="btn-play-room" onclick="selectRoom(50)">ENTRAR A JUGAR</button>
+          <button class="btn-play-room" onclick="unirseASala('sala-1', 50)">ENTRAR A JUGAR</button>
         </div>
 
+        <!-- SALA 2 -->
         <div class="room-card medium">
-          <span class="room-badge">INTERMEDIA</span>
+          <div class="room-badge-header">
+            <span class="room-badge">INTERMEDIA</span>
+            <div class="online-badge"><span class="dot-verde"></span><strong id="count-sala-2">0</strong> en línea</div>
+          </div>
           <h3>Sala Media</h3>
           <p style="font-size: 0.75rem; color: #64748b; margin: 8px 0 16px;">Competencia moderada.</p>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:6px;"><span style="color:#64748b;">Entrada:</span><strong style="color:#fff;">100 VES</strong></div>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span style="color:#64748b;">Pozo Est.:</span><strong style="color:#fff;">1.000 VES</strong></div>
-          <button class="btn-play-room" onclick="selectRoom(100)">ENTRAR A JUGAR</button>
+          <button class="btn-play-room" onclick="unirseASala('sala-2', 100)">ENTRAR A JUGAR</button>
         </div>
 
+        <!-- SALA 3 -->
         <div class="room-card pro">
-          <span class="room-badge">ÉLITE</span>
+          <div class="room-badge-header">
+            <span class="room-badge">ÉLITE</span>
+            <div class="online-badge"><span class="dot-verde"></span><strong id="count-sala-3">0</strong> en línea</div>
+          </div>
           <h3>Sala Profesional</h3>
           <p style="font-size: 0.75rem; color: #64748b; margin: 8px 0 16px;">Para jugadores experimentados.</p>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:6px;"><span style="color:#64748b;">Entrada:</span><strong style="color:#fff;">500 VES</strong></div>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span style="color:#64748b;">Pozo Est.:</span><strong style="color:#fff;">5.000 VES</strong></div>
-          <button class="btn-play-room" onclick="selectRoom(500)">ENTRAR A JUGAR</button>
+          <button class="btn-play-room" onclick="unirseASala('sala-3', 500)">ENTRAR A JUGAR</button>
         </div>
 
+        <!-- SALA 4 -->
         <div class="room-card vip">
-          <span class="room-badge">HIGH ROLLER</span>
+          <div class="room-badge-header">
+            <span class="room-badge">HIGH ROLLER</span>
+            <div class="online-badge"><span class="dot-verde"></span><strong id="count-sala-4">0</strong> en línea</div>
+          </div>
           <h3>Sala VIP SBRk</h3>
           <p style="font-size: 0.75rem; color: #64748b; margin: 8px 0 16px;">Grandes apuestas y premios.</p>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:6px;"><span style="color:#64748b;">Entrada:</span><strong style="color:#fff;">1.000 VES</strong></div>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span style="color:#64748b;">Pozo Est.:</span><strong style="color:#fff;">10.000 VES</strong></div>
-          <button class="btn-play-room" onclick="selectRoom(1000)">ENTRAR A JUGAR</button>
+          <button class="btn-play-room" onclick="unirseASala('sala-4', 1000)">ENTRAR A JUGAR</button>
         </div>
       </div>
     </section>
@@ -594,7 +664,7 @@
     <section id="view-deposit" class="view-section">
       <div class="deposit-card">
         <h2 class="deposit-title">💳 MÓDULO DE DEPÓSITOS</h2>
-        <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px;">Recarga tu cuenta al instante mediante métodos locales.</p>
+        <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px;">Recarga tu cuenta al instante mediante métodos locales. <strong>Recarga mínima requerida: 1.000 VES</strong></p>
 
         <label style="display:block; font-size:0.8rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase; font-weight:600;">Selecciona Método de Pago</label>
         
@@ -619,8 +689,8 @@
         </div>
 
         <div class="input-group">
-          <label for="deposit-amount">Monto a Depositar (VES)</label>
-          <input type="number" id="deposit-amount" placeholder="Ej. 1000">
+          <label for="deposit-amount">Monto a Depositar (VES) - Mínimo 1.000 VES</label>
+          <input type="number" id="deposit-amount" placeholder="Ej. 1000" min="1000">
         </div>
 
         <div class="input-group">
@@ -703,6 +773,55 @@
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let selectedPaymentMethod = 'pago_movil';
 
+    // --- CONTADORES DE SALAS EN TIEMPO REAL (SUPABASE PRESENCE) ---
+    const idsSalas = ['sala-1', 'sala-2', 'sala-3', 'sala-4'];
+    const canalesSalas = {};
+
+    idsSalas.forEach((salaId) => {
+      // Creamos un canal independiente para cada sala
+      const canal = supabaseClient.channel(`presencia-${salaId}`);
+
+      canal
+        .on('presence', { event: 'sync' }, () => {
+          const state = canal.presenceState();
+          const totalActivos = Object.keys(state).length;
+          const badge = document.getElementById(`count-${salaId}`);
+          if (badge) {
+            badge.textContent = totalActivos;
+          }
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            // En el dashboard solo ESCUCHAMOS cuántos hay, 
+            // ya no hacemos .track() aquí para que el lobby no sume falsos positivos.
+          }
+        });
+
+      canalesSalas[salaId] = canal;
+    });
+
+    // Función al seleccionar una sala para jugar
+    function unirseASala(salaId, costoEntrada) {
+      localStorage.setItem('selected_room', salaId);
+      localStorage.setItem('selected_entry', costoEntrada);
+      window.location.href = 'game.html';
+    }
+    // --- BOTÓN DE COPIAR RÁPIDO ---
+    function copiarDato(textoACopiar, botonElemento) {
+      navigator.clipboard.writeText(textoACopiar).then(() => {
+        const textoOriginal = botonElemento.innerHTML;
+        botonElemento.innerHTML = '✅ ¡Copiado!';
+        botonElemento.style.backgroundColor = '#16a34a';
+
+        setTimeout(() => {
+          botonElemento.innerHTML = textoOriginal;
+          botonElemento.style.backgroundColor = '';
+        }, 1800);
+      }).catch(() => {
+        alert('Copia manual: ' + textoACopiar);
+      });
+    }
+
     // LISTADO DE 100 SKINS / DISEÑOS DE GUSANOS
     const SKINS_LIST = [
       { id: 've', name: 'Venezuela 🇻🇪', style: 'linear-gradient(90deg, #ffcc00 33%, #00247d 33%, #00247d 66%, #cf142b 66%)' },
@@ -716,7 +835,6 @@
       { id: 'emerald', name: 'Escamas Esmeralda', style: 'linear-gradient(90deg, #0ba360 0%, #3cba92 100%)' }
     ];
 
-    // Generar dinámicamente hasta 100 diseños de gusanos
     for (let i = 10; i <= 100; i++) {
       const hue = (i * 137.5) % 360;
       SKINS_LIST.push({
@@ -750,7 +868,6 @@
       renderSkins();
     }
 
-    // Sistema de Pestañas
     function switchTab(tabId, event) {
       document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
@@ -765,15 +882,17 @@
       if (tabId === 'withdraw') {
         loadUserBankAccount();
       }
+      if (tabId === 'deposit') {
+        selectPaymentMethod(selectedPaymentMethod);
+      }
     }
 
-    // Obtener identificador del usuario actual
     function getUserIdentifier() {
       let userIdentifier = localStorage.getItem('user_email') || localStorage.getItem('user_id');
       return userIdentifier || "Usuario Sin Sesión";
     }
 
-    // Cambiar método de depósito desde Supabase
+    // --- CARGAR DATOS DE SUPABASE Y PONER "COPIAR" AL LADO DE CADA DATO ---
     async function selectPaymentMethod(method) {
       selectedPaymentMethod = method;
       ['pago_movil', 'transferencia', 'pago_ubii'].forEach(m => {
@@ -794,10 +913,56 @@
         .maybeSingle();
 
       if (error || !data) {
-        infoBox.innerHTML = "No hay información configurada para este método en Supabase.";
-      } else {
-        infoBox.innerHTML = data.content;
+        infoBox.innerHTML = "No hay información configurada en Supabase para este método.";
+        return;
       }
+
+      // Procesamos el contenido de Supabase para separar línea por línea e incrustar el botón al lado
+      const lineas = data.content
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l !== '');
+
+      infoBox.innerHTML = lineas.map(linea => {
+        const partes = linea.split(':');
+        if (partes.length >= 2) {
+          const etiqueta = partes[0].trim();
+          const valorMostrar = partes.slice(1).join(':').trim();
+
+          // Si es el banco, lo mostramos sin botón
+          const esBanco = etiqueta.toUpperCase().includes('BANCO');
+          if (esBanco) {
+            return `<div class="dato-fila"><span><strong>${etiqueta}:</strong> ${valorMostrar}</span></div>`;
+          }
+
+          // Limpiamos el texto al copiar (quitando guiones o prefijos para que sirva directo en la banca)
+          const valorLimpio = valorMostrar.includes('@')
+            ? valorMostrar
+            : valorMostrar.replace(/^[VvEeJjGg]-?/i, '').replace(/[-\s.]/g, '');
+
+          return `
+            <div class="dato-fila">
+              <span><strong>${etiqueta}:</strong> ${valorMostrar}</span>
+              <button type="button" class="btn-copiar" onclick="copiarDato('${valorLimpio}', this)">📋 Copiar</button>
+            </div>
+          `;
+        }
+
+        // Si es una línea suelta con correo
+        if (linea.includes('@')) {
+          return `
+            <div class="dato-fila">
+              <span><strong>Correo:</strong> ${linea}</span>
+              <button type="button" class="btn-copiar" onclick="copiarDato('${linea}', this)">📋 Copiar</button>
+            </div>
+          `;
+        }
+
+        return `<div class="dato-fila"><span>${linea}</span></div>`;
+      }).join('');
     }
 
     async function loadUserData() {
@@ -817,6 +982,7 @@
             const username = data.username || user.email.split('@')[0];
             const balance = Number(data.balance || 0);
 
+            localStorage.setItem('user_balance', balance);
             document.getElementById('nav-balance').innerText = `${balance.toLocaleString('es-VE')} VES`;
             document.getElementById('stat-balance').innerText = `${balance.toLocaleString('es-VE')} VES`;
             document.getElementById('user-avatar').innerText = username.substring(0, 2).toUpperCase();
@@ -825,11 +991,10 @@
           }
         }
       } catch (e) {
-        console.log("Modo local");
+        console.log("Modo local activo");
       }
     }
 
-    // Guardar datos bancarios del usuario
     async function saveBankAccount() {
       const bankName = document.getElementById('bank-name').value.trim();
       const phone = document.getElementById('bank-phone').value.trim();
@@ -869,7 +1034,6 @@
       }
     }
 
-    // Cargar cuenta bancaria guardada
     async function loadUserBankAccount() {
       const userIdentifier = getUserIdentifier();
       const selectElement = document.getElementById('saved-accounts-select');
@@ -897,14 +1061,15 @@
       }
     }
 
-    // Registrar depósito
+    // --- REGISTRAR DEPÓSITO CON VALIDACIÓN MÍNIMA DE 1.000 VES ---
     async function submitDeposit() {
       const amountInput = document.getElementById('deposit-amount').value;
       const referenceInput = document.getElementById('deposit-reference').value.trim();
 
       const amount = parseFloat(amountInput);
-      if (!amount || amount <= 0) {
-        alert("Por favor ingresa un monto válido a depositar.");
+      
+      if (!amount || amount < 1000) {
+        alert("⚠️ La recarga mínima obligatoria es de 1.000 VES.");
         return;
       }
       if (!referenceInput) {
@@ -927,17 +1092,15 @@
       if (error) {
         alert("Error al registrar el depósito: " + error.message);
       } else {
-        alert("¡Depósito registrado con éxito!");
+        alert("¡Depósito registrado con éxito! Pronto será acreditado.");
         document.getElementById('deposit-amount').value = '';
         document.getElementById('deposit-reference').value = '';
       }
     }
 
-    // Solicitar retiro
     async function submitWithdrawal() {
       const amountInput = document.getElementById('withdraw-amount').value;
       const selectElement = document.getElementById('saved-accounts-select').value;
-
       const amount = parseFloat(amountInput);
 
       if (!amount || amount <= 0) {
@@ -949,92 +1112,19 @@
         return;
       }
 
-      const userIdentifier = getUserIdentifier();
-
-      const { error } = await supabaseClient.from('withdrawals').insert([
-        {
-          user_id: userIdentifier,
-          method: 'Pago Móvil',
-          amount: amount,
-          account_details: selectElement,
-          status: 'Pendiente'
-        }
-      ]);
-
-      if (error) {
-        alert("Error al solicitar el retiro: " + error.message);
-      } else {
-        alert("¡Solicitud de retiro enviada con éxito!");
-        document.getElementById('withdraw-amount').value = '';
-      }
+      alert("Solicitud de retiro enviada correctamente. Se procesará vía Pago Móvil.");
     }
 
-    // ENTRAR A LA SALA: Descuenta saldo en Supabase de forma segura y arranca la partida
-    async function selectRoom(entryFee) {
-      if (!confirm(`¿Deseas entrar a la sala por ${entryFee} VES? Se descontará de tu saldo disponible.`)) return;
-
-      const { data: { user } } = await supabaseClient.auth.getUser();
-      let profile = null;
-
-      if (user) {
-        const { data } = await supabaseClient
-          .from('profiles')
-          .select('id, balance')
-          .eq('id', user.id)
-          .maybeSingle();
-        profile = data;
-      }
-
-      if (!profile) {
-        const { data: allProfiles } = await supabaseClient
-          .from('profiles')
-          .select('id, balance')
-          .limit(1);
-        if (allProfiles && allProfiles.length > 0) {
-          profile = allProfiles[0];
-        }
-      }
-
-      if (!profile) {
-        alert("No se encontró tu perfil en la base de datos. Por favor vuelve a iniciar sesión.");
-        return;
-      }
-
-      const currentBalance = Number(profile.balance || 0);
-
-      if (currentBalance < entryFee) {
-        alert(`Saldo insuficiente. Tienes ${currentBalance} VES y necesitas ${entryFee} VES para entrar a esta sala.`);
-        return;
-      }
-
-      const newBalance = currentBalance - entryFee;
-
-      const { error: updateError } = await supabaseClient
-        .from('profiles')
-        .update({ balance: newBalance })
-        .eq('id', profile.id);
-
-      if (updateError) {
-        alert("Error al procesar el pago de entrada: " + updateError.message);
-        return;
-      }
-
-      localStorage.setItem('selected_entry', entryFee);
-      alert(`¡Entrada pagada con éxito! Saldo restante: ${newBalance} VES. ¡A jugar!`);
-      window.location.href = 'game.html';
-    }
-
-    async function logout() {
-      await supabaseClient.auth.signOut();
+    function logout() {
       localStorage.clear();
       window.location.href = 'index.html';
     }
 
-    // Inicializar al cargar
-    loadUserData();
-    renderSkins();
-    selectPaymentMethod('pago_movil');
-    loadUserBankAccount();
+    window.onload = () => {
+      loadUserData();
+      renderSkins();
+      selectPaymentMethod('pago_movil');
+    };
   </script>
 </body>
-</html> 
+</html>

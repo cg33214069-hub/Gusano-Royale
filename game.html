@@ -111,9 +111,32 @@
   window.isPreparingTimerActive = true;
   setTimeout(() => { window.isPreparingTimerActive = false; }, 10000);
 
-  function abandonarPartida() {
+  // --- REGISTRO DE PRESENCIA EN VIVO EN LA SALA SELECCIONADA ---
+  window.addEventListener('DOMContentLoaded', async () => {
+    const salaElegida = localStorage.getItem('selected_room') || 'sala-1';
+    const userId = localStorage.getItem('user_id') || 'jugador_' + Math.random();
+
+    const gameChannel = supabaseClient.channel(`presencia-${salaElegida}`);
+
+    gameChannel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await gameChannel.track({
+          user_id: userId,
+          online_at: new Date().toISOString()
+        });
+      }
+    });
+
+    window.currentRoomChannel = gameChannel;
+  });
+
+  async function abandonarPartida() {
     if (confirm("¿Estás seguro de abandonar la partida? Perderás el dinero de la entrada.")) {
+      if (window.currentRoomChannel) {
+        await window.currentRoomChannel.untrack();
+      }
       localStorage.removeItem('selected_entry');
+      localStorage.removeItem('selected_room');
       window.location.href = 'dashboard.html';
     }
   }
@@ -127,6 +150,10 @@
       alert("Sesión no válida para acreditar el premio.");
       window.location.href = 'dashboard.html';
       return;
+    }
+
+    if (window.currentRoomChannel) {
+      await window.currentRoomChannel.untrack();
     }
 
     // 1. Obtener balance actual del perfil por id o email
