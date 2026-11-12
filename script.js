@@ -120,7 +120,7 @@ if (boostBtn) {
 }
 
 // ==========================================
-// 2. CONEXIÓN A SUPABASE Y CARGA DE COMIDA
+// 2. CONEXIÓN A SUPABASE Y SOCKETS DE RENDER
 // ==========================================
 let gameRoom = null;
 const myPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
@@ -133,6 +133,16 @@ let valorComidaConfig = 10.00;
 let arenaFoodOrbs = []; 
 
 const roomChannelName = `arena_ves_${selectedEntryFee}`;
+
+// Inicialización oficial de Socket.io conectada al servidor de Render
+let socket = null;
+if (typeof io !== 'undefined') {
+  socket = io('https://gusano-royale.onrender.com');
+  
+  socket.on('connect', () => {
+    console.log('¡Conectado al servidor de Render con éxito!');
+  });
+}
 
 async function verificarYCargarComida() {
     if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
