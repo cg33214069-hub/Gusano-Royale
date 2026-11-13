@@ -381,7 +381,6 @@
       line-height: 1.6;
     }
 
-    /* ESTILOS PARA LOS BOTONES DE COPIAR INDIVIDUAL */
     .dato-fila {
       display: flex;
       justify-content: space-between;
@@ -497,7 +496,6 @@
       border-radius: 4px;
     }
 
-    /* ESTILOS PARA EL CONTADOR EN VIVO */
     .online-badge {
       display: inline-flex;
       align-items: center;
@@ -585,7 +583,6 @@
         </div>
       </div>
 
-      <!-- SECCIÓN SUPERIOR: SALDO PRINCIPAL Y SELECTOR DE SKINS DE GUSANOS -->
       <div class="dashboard-top-grid">
         <div class="stat-card-single">
           <div class="stat-label">Saldo Total</div>
@@ -599,14 +596,13 @@
             <div class="active-skin-badge" id="active-skin-badge">Equipado: Venezuela 🇻🇪</div>
           </div>
           <div class="skins-grid" id="skins-grid">
-            <!-- Se generan dinámicamente los diseños de alta calidad -->
+            <!-- Se generan dinámicamente -->
           </div>
         </div>
       </div>
 
       <h2 class="section-title">🔹 SALAS DISPONIBLES EN VIVO</h2>
       <div class="rooms-grid">
-        <!-- SALA 1 -->
         <div class="room-card beginner">
           <div class="room-badge-header">
             <span class="room-badge">NOBATUM</span>
@@ -619,7 +615,6 @@
           <button class="btn-play-room" onclick="unirseASala('sala-1', 50)">ENTRAR A JUGAR</button>
         </div>
 
-        <!-- SALA 2 -->
         <div class="room-card medium">
           <div class="room-badge-header">
             <span class="room-badge">INTERMEDIA</span>
@@ -632,7 +627,6 @@
           <button class="btn-play-room" onclick="unirseASala('sala-2', 100)">ENTRAR A JUGAR</button>
         </div>
 
-        <!-- SALA 3 -->
         <div class="room-card pro">
           <div class="room-badge-header">
             <span class="room-badge">ÉLITE</span>
@@ -645,7 +639,6 @@
           <button class="btn-play-room" onclick="unirseASala('sala-3', 500)">ENTRAR A JUGAR</button>
         </div>
 
-        <!-- SALA 4 -->
         <div class="room-card vip">
           <div class="room-badge-header">
             <span class="room-badge">HIGH ROLLER</span>
@@ -683,7 +676,7 @@
           </div>
         </div>
 
-        <label style="display:block; font-size:0.8rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase; font-weight:600;">Datos para realizar el pago:</label>
+        <label style="display:block; font-size:0.8rem; color:#94a3b8; margin-bottom:8px; text-transform:uppercase; font-weight:600;">Datos para realizar el pago (Haz clic en copiar):</label>
         <div id="payment-info-box" class="bank-info-box">
           Cargando datos de pago...
         </div>
@@ -731,7 +724,6 @@
         <h2 class="deposit-title">👤 Perfil y Datos Bancarios</h2>
         <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px;" id="profile-email">Cargando datos de perfil...</p>
 
-        <!-- SECCIÓN DE SOPORTE VÍA WHATSAPP -->
         <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
           <div>
             <div style="font-weight: bold; color: #4ade80; font-size: 0.95rem; margin-bottom: 4px;">💬 Soporte y Asistencia por WhatsApp</div>
@@ -773,14 +765,29 @@
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let selectedPaymentMethod = 'pago_movil';
 
-    // --- CONTADORES DE SALAS EN TIEMPO REAL (SUPABASE PRESENCE) ---
+    // --- FUNCIÓN GLOBAL PARA COPIAR AL PORTAPAPELES ---
+    function copiarAlPortapapeles(texto, boton) {
+      navigator.clipboard.writeText(texto).then(() => {
+        const textoOriginal = boton.innerText;
+        boton.innerText = "¡Copiado!";
+        boton.style.background = "#22c55e";
+        
+        setTimeout(() => {
+          boton.innerText = textoOriginal;
+          boton.style.background = "#0ea5e9";
+        }, 2000);
+      }).catch(err => {
+        console.error('Error al copiar: ', err);
+        alert("No se pudo copiar el texto.");
+      });
+    }
+
+    // --- CONTADORES DE SALAS EN TIEMPO REAL ---
     const idsSalas = ['sala-1', 'sala-2', 'sala-3', 'sala-4'];
     const canalesSalas = {};
 
     idsSalas.forEach((salaId) => {
-      // Creamos un canal independiente para cada sala
       const canal = supabaseClient.channel(`presencia-${salaId}`);
-
       canal
         .on('presence', { event: 'sync' }, () => {
           const state = canal.presenceState();
@@ -790,17 +797,11 @@
             badge.textContent = totalActivos;
           }
         })
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            // En el dashboard solo ESCUCHAMOS cuántos hay, 
-            // ya no hacemos .track() aquí para que el lobby no sume falsos positivos.
-          }
-        });
-
+        .subscribe();
       canalesSalas[salaId] = canal;
     });
 
-    // --- FUNCIÓN SEGURA PARA UNIRSE A UNA SALA Y DESCONTAR LA ENTRADA ---
+    // --- FUNCIÓN UNIRSE A SALA ---
     async function unirseASala(salaId, costoEntrada) {
       const userId = localStorage.getItem('user_id');
       const userEmail = localStorage.getItem('user_email');
@@ -811,7 +812,6 @@
         return;
       }
 
-      // 1. Consultar saldo real directo de Supabase para evitar trampas
       let query = supabaseClient.from('profiles').select('id, balance');
       if (userId) {
         query = query.eq('id', userId);
@@ -828,14 +828,12 @@
 
       const saldoActual = Number(profile.balance || 0);
 
-      // 2. Validar si tiene suficiente dinero para la entrada
       if (saldoActual < costoEntrada) {
-        alert(`❌ Saldo insuficiente.\n\nNecesitas ${costoEntrada.toLocaleString('es-VE')} VES para entrar a esta sala y tu saldo actual es de ${saldoActual.toLocaleString('es-VE')} VES.\n\nPor favor ve a la pestaña "Depositar" para recargar.`);
+        alert(`❌ Saldo insuficiente.\n\nNecesitas ${costoEntrada.toLocaleString('es-VE')} VES para entrar a esta sala y tu saldo actual es de ${saldoActual.toLocaleString('es-VE')} VES.`);
         switchTab('deposit', null);
         return;
       }
 
-      // 3. Descontar la entrada del saldo del usuario
       const nuevoSaldo = saldoActual - costoEntrada;
 
       const { error: updateErr } = await supabaseClient
@@ -848,16 +846,15 @@
         return;
       }
 
-      // 4. Actualizar visualmente y en localStorage, y entrar a la arena
       localStorage.setItem('user_balance', nuevoSaldo);
       localStorage.setItem('selected_room', salaId);
       localStorage.setItem('selected_entry', costoEntrada);
 
-      alert(`✅ ¡Entrada pagada con éxito!\n\nSe te han descontado ${costoEntrada.toLocaleString('es-VE')} VES de tu saldo. ¡A sobrevivir!`);
+      alert(`✅ ¡Entrada pagada con éxito!\n\nSe te han descontado ${costoEntrada.toLocaleString('es-VE')} VES de tu saldo.`);
       window.location.href = 'game.html';
     }
 
-    // LISTADO DE 100 SKINS / DISEÑOS DE GUSANOS
+    // LISTADO DE 100 SKINS
     const SKINS_LIST = [
       { id: 've', name: 'Venezuela 🇻🇪', style: 'linear-gradient(90deg, #ffcc00 33%, #00247d 33%, #00247d 66%, #cf142b 66%)' },
       { id: 'neon_cyber', name: 'Neón Cyberpunk', style: 'linear-gradient(90deg, #00f2fe 0%, #4facfe 100%)' },
@@ -922,12 +919,7 @@
       }
     }
 
-    function getUserIdentifier() {
-      let userIdentifier = localStorage.getItem('user_email') || localStorage.getItem('user_id');
-      return userIdentifier || "Usuario Sin Sesión";
-    }
-
-    // --- CARGAR DATOS DE SUPABASE Y PONER "COPIAR" AL LADO DE CADA DATO ---
+    // --- CARGAR DATOS DE PAGO Y SEPARAR CADA DATO 100% INDIVIDUALMENTE ---
     async function selectPaymentMethod(method) {
       selectedPaymentMethod = method;
       ['pago_movil', 'transferencia', 'pago_ubii'].forEach(m => {
@@ -952,285 +944,279 @@
         return;
       }
 
-      // Procesamos el contenido de Supabase para separar línea por línea e incrustar el botón al lado
-      const lineas = data.content
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<\/p>/gi, '\n')
-        .replace(/<[^>]+>/g, '')
-        .split('\n')
-        .map(l => l.trim())
-        .filter(l => l !== '');
+      let texto = data.content || "";
+      
+      // Limpiamos espacios múltiples y saltos extraños
+      texto = texto.replace(/\s+/g, ' ');
 
-      infoBox.innerHTML = lineas.map(linea => {
-        const partes = linea.split(':');
-        if (partes.length >= 2) {
+      // Lista ampliada de etiquetas clave para forzarles un salto de línea antes
+      const palabrasClave = [
+        'BANCO:', 'CUENTA:', 'NUMERO DE CUENTA:', 'NRO DE CUENTA:', 
+        'TELÉFONO:', 'TELEFONO:', 'CELULAR:', 
+        'CÉDULA:', 'CEDULA:', 'RIF:', 'CÉDULA / RIF:', 'CEDULA / RIF:', 'CÉDULA/', 'CEDULA/',
+        'NOMBRE:', 'TITULAR:', 'BENEFICIARIO:',
+        'CORREO:', 'EMAIL:', 'CORREO UBII:', 'CORREO UBII L:'
+      ];
+      
+      palabrasClave.forEach(pc => {
+        const regex = new RegExp(pc, 'gi');
+        texto = texto.replace(regex, '\n' + pc);
+      });
+
+      const lineas = texto.split('\n').filter(l => l.trim() !== '');
+      let htmlFilas = '<div style="margin-bottom: 12px; font-weight: bold; color: #38bdf8; font-size: 0.85rem; text-transform: uppercase;">Haz clic en el botón copiar del dato que necesites:</div>';
+
+      lineas.forEach(linea => {
+        if (linea.includes(':')) {
+          const partes = linea.split(':');
           const etiqueta = partes[0].trim();
-          const valorMostrar = partes.slice(1).join(':').trim();
+          const valor = partes.slice(1).join(':').trim();
 
-          // Si es el banco, lo mostramos sin botón
-          const esBanco = etiqueta.toUpperCase().includes('BANCO');
-          if (esBanco) {
-            return `<div class="dato-fila"><span><strong>${etiqueta}:</strong> ${valorMostrar}</span></div>`;
+          if (valor) {
+            htmlFilas += `
+              <div class="dato-fila" style="display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03); padding: 10px 14px; border-radius: 8px; margin: 8px 0; border: 1px solid rgba(255, 255, 255, 0.05); gap: 10px;">
+                <div style="overflow: hidden; word-break: break-all;">
+                  <span style="font-size: 0.7rem; color: #94a3b8; display: block; text-transform: uppercase; font-weight: 600;">${etiqueta}</span>
+                  <strong style="font-size: 0.95rem; color: #ffffff;">${valor}</strong>
+                </div>
+                <button class="btn-copiar" style="white-space: nowrap;" onclick="copiarAlPortapapeles('${valor}', this)">📋 Copiar</button>
+              </div>
+            `;
           }
-
-          // Limpiamos el texto al copiar (quitando guiones o prefijos para que sirva directo en la banca)
-          const valorLimpio = valorMostrar.includes('@')
-            ? valorMostrar
-            : valorMostrar.replace(/^[VvEeJjGg]-?/i, '').replace(/[-\s.]/g, '');
-
-          return `
-            <div class="dato-fila">
-              <span><strong>${etiqueta}:</strong> ${valorMostrar}</span>
-              <button type="button" class="btn-copiar" onclick="copiarDato('${valorLimpio}', this)">📋 Copiar</button>
+        } else if (linea.trim() !== '') {
+          htmlFilas += `
+            <div class="dato-fila" style="display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03); padding: 10px 14px; border-radius: 8px; margin: 8px 0; border: 1px solid rgba(255, 255, 255, 0.05); gap: 10px;">
+              <span style="font-size: 0.9rem; color: #cbd5e1; word-break: break-all;">${linea}</span>
+              <button class="btn-copiar" style="white-space: nowrap;" onclick="copiarAlPortapapeles('${linea}', this)">📋 Copiar</button>
             </div>
           `;
         }
+      });
 
-        // Si es una línea suelta con correo
-        if (linea.includes('@')) {
-          return `
-            <div class="dato-fila">
-              <span><strong>Correo:</strong> ${linea}</span>
-              <button type="button" class="btn-copiar" onclick="copiarDato('${linea}', this)">📋 Copiar</button>
-            </div>
-          `;
-        }
-
-        return `<div class="dato-fila"><span>${linea}</span></div>`;
-      }).join('');
+      infoBox.innerHTML = htmlFilas;
     }
-
     async function loadUserData() {
-      try {
-        const { data: { user } } = await supabaseClient.auth.getUser();
-        if (user) {
-          localStorage.setItem('user_id', user.id);
-          localStorage.setItem('user_email', user.email);
+      const userId = localStorage.getItem('user_id');
+      const userEmail = localStorage.getItem('user_email');
 
-          const { data } = await supabaseClient
-            .from('profiles')
-            .select('username, balance')
-            .eq('id', user.id)
-            .maybeSingle();
+      if (!userId && !userEmail) return;
 
-          if (data) {
-            const username = data.username || user.email.split('@')[0];
-            const balance = Number(data.balance || 0);
+      let query = supabaseClient.from('profiles').select('*');
+      if (userId) query = query.eq('id', userId);
+      else query = query.eq('email', userEmail);
 
-            localStorage.setItem('user_balance', balance);
-            document.getElementById('nav-balance').innerText = `${balance.toLocaleString('es-VE')} VES`;
-            document.getElementById('stat-balance').innerText = `${balance.toLocaleString('es-VE')} VES`;
-            document.getElementById('user-avatar').innerText = username.substring(0, 2).toUpperCase();
-            document.getElementById('profile-email').innerText = `Correo: ${user.email} | Usuario: ${username}`;
-            localStorage.setItem('player_name', username);
-          }
+      const { data: profile } = await query.maybeSingle();
+      if (profile) {
+        const bal = Number(profile.balance || 0);
+        const balStr = bal.toLocaleString('es-VE', { minimumFractionDigits: 2 }) + " VES";
+        
+        const navBal = document.getElementById('nav-balance');
+        const statBal = document.getElementById('stat-balance');
+        if (navBal) navBal.innerText = balStr;
+        if (statBal) statBal.innerText = balStr;
+
+        const emailEl = document.getElementById('profile-email');
+        if (emailEl) emailEl.innerText = `Conectado como: ${profile.email || userEmail}`;
+        
+        const avatarEl = document.getElementById('user-avatar');
+        if (avatarEl && profile.email) {
+          avatarEl.innerText = profile.email.substring(0, 2).toUpperCase();
         }
-      } catch (e) {
-        console.log("Modo local activo");
       }
     }
 
-    async function saveBankAccount() {
-      const bankName = document.getElementById('bank-name').value.trim();
-      const phone = document.getElementById('bank-phone').value.trim();
-      const idCard = document.getElementById('bank-idcard').value.trim();
+    async function submitDeposit() {
+      const amountInput = document.getElementById('deposit-amount').value;
+      const reference = document.getElementById('deposit-reference').value.trim();
+      const amount = parseFloat(amountInput);
 
-      if (!bankName || !phone || !idCard) {
-        alert("Por favor completa todos los campos bancarios.");
+      if (!amount || amount < 1000) {
+        alert("⚠️ El monto mínimo de depósito es de 1.000 VES.");
+        return;
+      }
+      if (!reference) {
+        alert("⚠️ Por favor ingresa el número de referencia o hash del pago.");
         return;
       }
 
-      const userIdentifier = getUserIdentifier();
-
-      const { data: existing } = await supabaseClient
-        .from('user_bank_accounts')
-        .select('id')
-        .eq('user_id', userIdentifier)
-        .maybeSingle();
-
-      let error;
-      if (existing) {
-        const res = await supabaseClient
-          .from('user_bank_accounts')
-          .update({ bank_name: bankName, phone: phone, id_card: idCard })
-          .eq('user_id', userIdentifier);
-        error = res.error;
-      } else {
-        const res = await supabaseClient
-          .from('user_bank_accounts')
-          .insert([{ user_id: userIdentifier, bank_name: bankName, phone: phone, id_card: idCard }]);
-        error = res.error;
+      const userId = localStorage.getItem('user_id');
+      if (!userId) {
+        alert("Sesión no válida. Inicia sesión nuevamente.");
+        return;
       }
+
+      const { error } = await supabaseClient
+        .from('deposits')
+        .insert([{
+          user_id: userId,
+          amount: amount,
+          reference: reference,
+          method: selectedPaymentMethod,
+          status: 'pendiente'
+        }]);
 
       if (error) {
-        alert("Error al guardar los datos bancarios: " + error.message);
-      } else {
-        alert("¡Datos bancarios guardados con éxito en el sistema!");
+        alert("Error al registrar el depósito: " + error.message);
+        return;
       }
-    }
 
+      alert("✅ ¡Depósito reportado con éxito!\n\nSerá verificado y acreditado a tu saldo en breve.");
+      document.getElementById('deposit-amount').value = '';
+      document.getElementById('deposit-reference').value = '';
+    }
     async function loadUserBankAccount() {
-      const userIdentifier = getUserIdentifier();
-      const selectElement = document.getElementById('saved-accounts-select');
+      const userId = localStorage.getItem('user_id');
+      const selectEl = document.getElementById('saved-accounts-select');
+      if (!selectEl) return;
+
+      if (!userId) {
+        selectEl.innerHTML = '<option value="">Inicia sesión para ver tus cuentas</option>';
+        return;
+      }
 
       const { data, error } = await supabaseClient
         .from('user_bank_accounts')
         .select('*')
-        .eq('user_id', userIdentifier);
+        .eq('user_id', userId);
 
       if (error || !data || data.length === 0) {
-        selectElement.innerHTML = `<option value="">No tienes cuentas guardadas. Regístrala en Perfil</option>`;
+        selectEl.innerHTML = '<option value="">No tienes cuentas guardadas. Ve a "Perfil & Cuentas"</option>';
         return;
       }
 
-      selectElement.innerHTML = data.map(acc => `
-        <option value="${acc.bank_name} | ${acc.phone} | ${acc.id_card}">
-          ${acc.bank_name} | Tel: ${acc.phone} | Cédula: ${acc.id_card}
-        </option>
-      `).join('');
-
-      if (data[0]) {
-        document.getElementById('bank-name').value = data[0].bank_name || '';
-        document.getElementById('bank-phone').value = data[0].phone || '';
-        document.getElementById('bank-idcard').value = data[0].id_card || '';
-      }
+      selectEl.innerHTML = '<option value="">Selecciona una cuenta...</option>' + data.map(acc => {
+        const detalle = `${acc.banco || acc.bank_name} - Telf: ${acc.telefono || acc.phone} - C.I: ${acc.cedula || acc.id_card}`;
+        return `<option value="${detalle}">${detalle}</option>`;
+      }).join('');
     }
 
-    // --- REGISTRAR DEPÓSITO CON VALIDACIÓN MÍNIMA DE 1.000 VES ---
-    async function submitDeposit() {
-      const amountInput = document.getElementById('deposit-amount').value;
-      const referenceInput = document.getElementById('deposit-reference').value.trim();
+   // --- FUNCIÓN DEFINITIVA PARA GUARDAR DATOS BANCARIOS ---
+    async function saveBankAccount() {
+      const bankName = document.getElementById('bank-name')?.value.trim();
+      const phone = document.getElementById('bank-phone')?.value.trim();
+      const idCard = document.getElementById('bank-idcard')?.value.trim();
 
-      const amount = parseFloat(amountInput);
+      if (!bankName || !phone || !idCard) {
+        alert("Por favor completa todos los campos.");
+        return;
+      }
+
+      // Obtenemos el ID del usuario actual de la sesión
+      const userId = sessionStorage.getItem('user_id') || localStorage.getItem('user_id');
       
-      if (!amount || amount < 1000) {
-        alert("⚠️ La recarga mínima obligatoria es de 1.000 VES.");
-        return;
-      }
-      if (!referenceInput) {
-        alert("Por favor ingresa el número de referencia o hash.");
+      if (!userId) {
+        alert("Error: No se encontró la sesión del usuario. Por favor vuelve a iniciar sesión.");
         return;
       }
 
-      const userIdentifier = getUserIdentifier();
+      // 1. Primero borramos registros anteriores de este usuario para evitar duplicados
+      await supabaseClient
+        .from('user_bank_accounts')
+        .delete()
+        .eq('user_id', userId);
 
-      const { error } = await supabaseClient.from('deposits').insert([
-        {
-          user_id: userIdentifier,
-          method: selectedPaymentMethod,
-          amount: amount,
-          reference: referenceInput,
-          status: 'Pendiente'
-        }
-      ]);
+      // 2. Insertamos el nuevo registro limpio
+      const { error } = await supabaseClient
+        .from('user_bank_accounts')
+        .insert({
+          user_id: userId,
+          bank_name: bankName,
+          phone: phone,
+          id_card: idCard
+        });
 
       if (error) {
-        alert("Error al registrar el depósito: " + error.message);
-      } else {
-        alert("¡Depósito registrado con éxito! Pronto será acreditado.");
-        document.getElementById('deposit-amount').value = '';
-        document.getElementById('deposit-reference').value = '';
+        alert("Error al guardar cuenta: " + error.message);
+        return;
       }
+
+      alert("✅ ¡Datos bancarios guardados con éxito!");
     }
+    async function submitWithdrawal() {
+      const amountInput = document.getElementById('withdraw-amount').value;
+      const selectElement = document.getElementById('saved-accounts-select').value;
+      const amount = parseFloat(amountInput);
 
-   async function submitWithdrawal() {
-  const amountInput = document.getElementById('withdraw-amount').value;
-  const selectElement = document.getElementById('saved-accounts-select').value;
-  const amount = parseFloat(amountInput);
+      if (!amount || amount <= 0) {
+        alert("Por favor ingresa un monto válido a retirar.");
+        return;
+      }
+      if (!selectElement) {
+        alert("Por favor selecciona una cuenta bancaria guardada.");
+        return;
+      }
 
-  if (!amount || amount <= 0) {
-    alert("Por favor ingresa un monto válido a retirar.");
-    return;
-  }
-  if (!selectElement) {
-    alert("Por favor selecciona una cuenta bancaria guardada.");
-    return;
-  }
+      const userId = localStorage.getItem('user_id');
+      const userEmail = localStorage.getItem('user_email');
 
-  // Verificamos si existe el cliente de Supabase
-  if (typeof supabaseClient === 'undefined' || !supabaseClient) {
-    alert("Error de conexión con la base de datos.");
-    return;
-  }
+      if (!userId && !userEmail) {
+        alert("No se encontró la sesión del usuario.");
+        return;
+      }
 
-  const userId = localStorage.getItem('user_id');
-  const userEmail = localStorage.getItem('user_email');
+      let query = supabaseClient.from('profiles').select('id, balance');
+      if (userId) query = query.eq('id', userId);
+      else query = query.eq('email', userEmail);
 
-  if (!userId && !userEmail) {
-    alert("No se encontró la sesión del usuario. Por favor vuelve a iniciar sesión.");
-    return;
-  }
+      const { data: profile, error: errFetch } = await query.maybeSingle();
 
-  try {
-    // 1. Consultamos el perfil para verificar saldo actual
-    let query = supabaseClient.from('profiles').select('id, balance');
-    if (userId) {
-      query = query.eq('id', userId);
-    } else {
-      query = query.eq('email', userEmail);
-    }
+      if (errFetch || !profile) {
+        alert("No se pudo verificar tu saldo en el servidor.");
+        return;
+      }
 
-    const { data: profile, error: errFetch } = await query.maybeSingle();
+      const saldoActual = Number(profile.balance || 0);
 
-    if (errFetch || !profile) {
-      alert("No se pudo verificar tu saldo en el servidor.");
-      return;
-    }
+      if (saldoActual < amount) {
+        alert("No tienes suficiente saldo disponible para este retiro.");
+        return;
+      }
 
-    const saldoActual = Number(profile.balance || 0);
+      const nuevoSaldo = saldoActual - amount;
 
-    if (saldoActual < amount) {
-      alert("No tienes suficiente saldo disponible para este retiro.");
-      return;
-    }
-
-    const nuevoSaldo = saldoActual - amount;
-
-    // 2. Insertamos la solicitud en la tabla withdrawals de Supabase
-    const { error: errInsert } = await supabaseClient
-      .from('withdrawals')
-      .insert([
-        { 
+      const { error: errInsert } = await supabaseClient
+        .from('withdrawals')
+        .insert([{ 
           user_id: profile.id, 
+          amount: amount,
           monto: amount, 
           cuenta_bancaria: selectElement, 
+          account_details: selectElement,
+          method: 'pago_movil',
           estado: 'pendiente',
           fecha: new Date().toISOString()
-        }
-      ]);
+        }]);
 
-    if (errInsert) {
-      console.error("Error al registrar retiro:", errInsert.message);
-      alert("Hubo un error al registrar la solicitud en el sistema.");
-      return;
-    }
+      if (errInsert) {
+        alert("Hubo un error al registrar la solicitud: " + errInsert.message);
+        return;
+      }
 
-    // 3. Actualizamos el saldo restante en la tabla profiles de Supabase
-    const { error: errUpdate } = await supabaseClient
-      .from('profiles')
-      .update({ balance: nuevoSaldo })
-      .eq('id', profile.id);
+      const { error: errUpdate } = await supabaseClient
+        .from('profiles')
+        .update({ balance: nuevoSaldo })
+        .eq('id', profile.id);
 
-    if (errUpdate) {
-      console.error("Error al actualizar saldo:", errUpdate.message);
-      alert("Se creó la solicitud pero hubo un problema al actualizar tu saldo.");
-      return;
-    }
+      if (errUpdate) {
+        alert("Se creó la solicitud pero hubo un problema al actualizar tu saldo.");
+        return;
+      }
 
-    // 4. Actualizamos el saldo local seguro en el navegador
-    if (typeof saveSecureBalance === 'function') {
-      saveSecureBalance(nuevoSaldo);
-    } else {
       localStorage.setItem('user_balance', nuevoSaldo.toString());
+      alert("¡Solicitud de retiro enviada correctamente! Se procesará vía Pago Móvil.");
+      location.reload();
     }
 
-    alert("¡Solicitud de retiro enviada correctamente. Se procesará vía Pago Móvil.");
-    
-    // Recargamos la página para reflejar el descuento del saldo en pantalla
-    location.reload();
+    function logout() {
+      localStorage.clear();
+      window.location.href = 'index.html';
+    }
 
-  } catch (err) {
-    console.error("Error inesperado en retiro:", err);
-    alert("Ocurrió un error inesperado al procesar el retiro.");
-  }
-}
+    window.addEventListener('DOMContentLoaded', () => {
+      renderSkins();
+      loadUserData();
+      selectPaymentMethod('pago_movil');
+    });
+  </script>
+</body>
+</html>

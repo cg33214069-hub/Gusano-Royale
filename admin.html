@@ -382,22 +382,9 @@
     <!-- TABLA DE DEPÓSITOS -->
     <div id="section-deposits" class="card">
       <h2 style="font-size: 1.1rem; margin-bottom: 16px; color: #fff;">Lista de Depósitos Ingresados</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Usuario</th>
-            <th>Método</th>
-            <th>Monto (VES)</th>
-            <th>Referencia</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="deposits-table-body">
-          <tr><td colspan="7" style="text-align: center; color: #64748b;">Cargando depósitos...</td></tr>
-        </tbody>
-      </table>
+      <div id="admin-deposits-container">
+        <p style='color: #64748b; text-align: center;'>Cargando depósitos...</p>
+      </div>
     </div>
 
     <!-- TABLA DE RETIROS -->
@@ -456,33 +443,6 @@
 
   </div>
 
-  <!-- MODAL DE APROBACIÓN DE DEPÓSITO Y FACTURA -->
-  <div id="modal-deposit-overlay" class="modal-overlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <span>🧾 Aprobar Depósito y Factura</span>
-        <span onclick="closeDepositModal()" style="cursor: pointer; color: #64748b;">✕</span>
-      </div>
-
-      <div class="modal-body-box">
-        <div class="modal-row"><span style="color: #64748b;">Usuario:</span><span id="modal-dep-user" style="color: #fff; font-weight: bold;">-</span></div>
-        <div class="modal-row"><span style="color: #64748b;">Método:</span><span id="modal-dep-method" style="color: #38bdf8;">-</span></div>
-        <div class="modal-row"><span style="color: #64748b;">Referencia:</span><span id="modal-dep-ref" style="color: #fff;">-</span></div>
-        <div class="modal-row highlight"><span>Monto Acreditado:</span><span id="modal-dep-amount" style="color: #22c55e;">0 VES</span></div>
-      </div>
-
-      <div class="modal-field">
-        <label for="input-dep-phone">Teléfono del Jugador (para WhatsApp)</label>
-        <input type="text" id="input-dep-phone" placeholder="Ej. 584121234567" autocomplete="off">
-      </div>
-
-      <div class="modal-actions">
-        <button class="btn-confirm-pay" onclick="confirmDepositAndSendInvoice()">Aprobar y Enviar Factura</button>
-        <button class="btn-cancel-modal" onclick="closeDepositModal()">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
   <!-- MODAL DE APROBACIÓN DE RETIRO Y FACTURACIÓN AUTOMÁTICA -->
   <div id="modal-withdrawal-overlay" class="modal-overlay">
     <div class="modal-card">
@@ -529,7 +489,6 @@
     let currentFoundUser = null;
     let globalUserMap = {}; 
     let activeWithdrawal = null; 
-    let activeDeposit = null; 
 
     // ==========================================
     // CONTROL DE COMIDA Y VES EN EL MAPA
@@ -620,7 +579,20 @@
         loadPromotoresData();
       }
     }
-
+// --- FUNCIÓN GLOBAL PARA BUSCAR PERFILES ---
+    function getProfileData(rawUserId) {
+      if (!rawUserId) return { name: 'Desconocido', phone: '' };
+      const searchVal = String(rawUserId).trim().toLowerCase();
+      if (globalUserMap[searchVal]) return globalUserMap[searchVal];
+      for (let key in globalUserMap) {
+        if (key.includes(searchVal) || searchVal.includes(key)) return globalUserMap[key];
+      }
+      if (searchVal.includes('@')) {
+        const emailPrefix = searchVal.split('@')[0];
+        return { name: emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1), phone: '' };
+      }
+      return { name: rawUserId, phone: '' };
+    } 
     async function loadData() {
       const { data: profiles } = await supabaseClient.from('profiles').select('*');
 
@@ -628,7 +600,6 @@
       if (profiles && profiles.length > 0) {
         profiles.forEach(p => {
           const displayName = p.username || p.name || (p.email ? p.email.split('@')[0] : 'Usuario');
-          
           if (p.id) globalUserMap[String(p.id).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: p.balance || 0 };
           if (p.email) globalUserMap[String(p.email).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: p.balance || 0 };
           if (p.username) globalUserMap[String(p.username).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: p.balance || 0 };
@@ -639,90 +610,59 @@
       function getProfileData(rawUserId) {
         if (!rawUserId) return { name: 'Desconocido', phone: '' };
         const searchVal = String(rawUserId).trim().toLowerCase();
-
         if (globalUserMap[searchVal]) return globalUserMap[searchVal];
-
         for (let key in globalUserMap) {
           if (key.includes(searchVal) || searchVal.includes(key)) return globalUserMap[key];
         }
-
         if (searchVal.includes('@')) {
           const emailPrefix = searchVal.split('@')[0];
           return { name: emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1), phone: '' };
         }
-
         return { name: rawUserId, phone: '' };
       }
 
-      // 1. Cargar Depósitos
-      const { data: deposits } = await supabaseClient
-        .from('deposits')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // --- CARGAR DEPÓSITOS PENDIENTES ---
+      await cargarDepositosAdmin();
 
-      let totalDeposited = 0;
-      const depBody = document.getElementById('deposits-table-body');
-      
-      if (deposits && deposits.length > 0) {
-        depBody.innerHTML = deposits.map(d => {
-          if (d.status === 'Aprobado') totalDeposited += Number(d.amount);
-          const userData = getProfileData(d.user_id);
-          const safeUser = userData.name.replace(/'/g, "\\'");
-          const userPhone = userData.phone || '';
-
-          return `
-            <tr>
-              <td>${new Date(d.created_at).toLocaleString()}</td>
-              <td><strong>${userData.name}</strong></td>
-              <td>${d.method}</td>
-              <td style="color: #22c55e; font-weight: bold;">+${Number(d.amount).toLocaleString('es-VE')} VES</td>
-              <td><code>${d.reference}</code></td>
-              <td><span class="badge badge-${d.status}">${d.status}</span></td>
-              <td>
-                ${d.status === 'Pendiente' ? `
-                  <button class="btn-approve" onclick="openDepositModal('${d.id}', '${safeUser}', ${d.amount}, '${d.method}', '${d.reference}', '${userPhone}')">Aprobar</button>
-                  <button class="btn-reject" onclick="rejectTransaction('deposits', '${d.id}')">Rechazar</button>
-                ` : '<span style="color:#64748b;">Procesado</span>'}
-              </td>
-            </tr>
-          `;
-        }).join('');
-      } else {
-        depBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #64748b;">No hay depósitos registrados.</td></tr>`;
-      }
-
-      // 2. Cargar Retiros
+      // --- CARGAR RETIROS ---
       const { data: withdrawals } = await supabaseClient
         .from('withdrawals')
         .select('*')
         .order('created_at', { ascending: false });
 
       let totalWithdrawn = 0;
-      const withBody = document.getElementById('withdrawals-table-body');
+      let totalDeposited = 0; // Calculado desde depósitos aprobados
+      
+      const { data: depAprobados } = await supabaseClient
+        .from('deposits')
+        .select('amount')
+        .eq('status', 'aprobado');
 
+      if (depAprobados) {
+        totalDeposited = depAprobados.reduce((sum, item) => sum + Number(item.amount), 0);
+      }
+
+      const withBody = document.getElementById('withdrawals-table-body');
       if (withdrawals && withdrawals.length > 0) {
         withBody.innerHTML = withdrawals.map(w => {
-          if (w.status === 'Aprobado') totalWithdrawn += Number(w.amount);
+          if (w.status === 'Aprobado' || w.status === 'aprobado') totalWithdrawn += Number(w.amount);
           const userData = getProfileData(w.user_id);
           const accountInfo = w.account_details || w.account_info || 'N/A';
-          
-          const safeUser = userData.name.replace(/'/g, "\\'");
-          const safeAccount = accountInfo.replace(/'/g, "\\'");
-          const userPhone = userData.phone || '';
+          const badgeClass = `badge-${w.status || 'Pendiente'}`;
 
           return `
             <tr>
               <td>${new Date(w.created_at).toLocaleString()}</td>
               <td><strong>${userData.name}</strong></td>
-              <td>${w.method}</td>
-              <td style="color: #ef4444; font-weight: bold;">-${Number(w.amount).toLocaleString('es-VE')} VES</td>
-              <td><code>${accountInfo}</code></td>
-              <td><span class="badge badge-${w.status}">${w.status}</span></td>
+              <td>${w.method || 'Pago Móvil'}</td>
+              <td>${Number(w.amount).toLocaleString('es-VE')} VES</td>
+              <td style="font-size:0.85rem; color:#38bdf8;">${accountInfo}</td>
+              <td><span class="badge ${badgeClass}">${w.status || 'Pendiente'}</span></td>
               <td>
-                ${w.status === 'Pendiente' ? `
-                  <button class="btn-approve" onclick="openWithdrawalModal('${w.id}', '${safeUser}', ${w.amount}, '${safeAccount}', '${userPhone}')">Aprobar</button>
+                ${(!w.status || w.status === 'Pendiente') ? `
+                  <button class="btn-approve" onclick="openWithdrawalModal('${w.id}', '${w.user_id}', ${w.amount}, '${accountInfo}', '${userData.phone}')">Aprobar</button>
                   <button class="btn-reject" onclick="rejectTransaction('withdrawals', '${w.id}')">Rechazar</button>
-                ` : '<span style="color:#64748b;">Procesado</span>'}
+                ` : '<span style="color:#64748b; font-size:0.8rem;">Procesado</span>'}
               </td>
             </tr>
           `;
@@ -731,210 +671,128 @@
         withBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #64748b;">No hay solicitudes de retiro.</td></tr>`;
       }
 
-      document.getElementById('metric-total-deposits').innerText = `${totalDeposited.toLocaleString('es-VE')} VES`;
-      document.getElementById('metric-total-withdrawals').innerText = `${totalWithdrawn.toLocaleString('es-VE')} VES`;
+      // Actualizar métricas financieras
       const movingBalance = totalDeposited - totalWithdrawn;
-      document.getElementById('metric-moving-balance').innerText = `${movingBalance.toLocaleString('es-VE')} VES`;
+      document.getElementById('metric-total-deposits').innerText = totalDeposited.toLocaleString('es-VE') + ' VES';
+      document.getElementById('metric-total-withdrawals').innerText = totalWithdrawn.toLocaleString('es-VE') + ' VES';
+      document.getElementById('metric-moving-balance').innerText = movingBalance.toLocaleString('es-VE') + ' VES';
     }
 
-    async function rejectTransaction(table, id) {
-      if (!confirm("¿Estás seguro de rechazar esta solicitud?")) return;
-      const { error } = await supabaseClient.from(table).update({ status: 'Rechazado' }).eq('id', id);
+    // --- CARGAR DEPÓSITOS PENDIENTES EN EL PANEL ---
+    async function cargarDepositosAdmin() {
+      const contenedorAdmin = document.getElementById('admin-deposits-container');
+      if (!contenedorAdmin) return;
+
+      contenedorAdmin.innerHTML = "<p style='color: #64748b; text-align: center;'>Cargando depósitos...</p>";
+
+      const { data: depositos, error } = await supabaseClient
+        .from('deposits')
+        .select('*')
+        .eq('status', 'pendiente')
+        .order('created_at', { ascending: false });
+
       if (error) {
-        alert("Error al rechazar: " + error.message);
-      } else {
-        alert("Solicitud rechazada con éxito.");
-        loadData();
+        contenedorAdmin.innerHTML = "<p style='color: #ef4444; text-align: center;'>Error al cargar los depósitos: " + error.message + "</p>";
+        return;
       }
+
+      if (!depositos || depositos.length === 0) {
+        contenedorAdmin.innerHTML = "<p style='color: #94a3b8; text-align: center;'>No hay depósitos pendientes por aprobar.</p>";
+        return;
+      }
+
+      contenedorAdmin.innerHTML = depositos.map(dep => {
+        const userData = getProfileData(dep.user_id);
+        const emailUser = userData.name || dep.user_id;
+
+        return `
+          <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <div style="font-weight: bold; color: #38bdf8; font-size: 0.95rem;">Usuario: ${emailUser}</div>
+              <div style="color: #fff; font-size: 1.1rem; font-weight: bold; margin: 4px 0;">Monto: ${Number(dep.amount).toLocaleString('es-VE')} VES</div>
+              <div style="font-size: 0.8rem; color: #94a3b8;">Método: <strong>${dep.method}</strong> | Ref/Hash: <strong>${dep.reference}</strong></div>
+              <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">Fecha: ${new Date(dep.created_at).toLocaleString()}</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button onclick="aprobarDeposito('${dep.id}', '${dep.user_id}', ${dep.amount}, '${dep.reference}', '${emailUser}')" style="background: #22c55e; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">✅ Aprobar</button>
+              <button onclick="rechazarDeposito('${dep.id}')" style="background: #ef4444; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">❌ Rechazar</button>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
+    // --- FUNCIÓN PARA APROBAR DEPÓSITO, ACREDITAR SALDO Y ABRIR WHATSAPP CON FACTURA ---
+    async function aprobarDeposito(depositId, userId, monto, referencia, emailUsuario) {
+      if (!confirm(`¿Estás seguro de aprobar el depósito de ${Number(monto).toLocaleString('es-VE')} VES? Esto le sumará el saldo al usuario.`)) return;
 
-    async function searchUserBalance() {
-      const query = document.getElementById('search-user-input').value.trim();
-      if (!query) {
-        alert("Por favor escribe un nombre de usuario o correo.");
-        return;
-      }
-
-      const { data: profiles, error } = await supabaseClient.from('profiles').select('*');
-      if (error || !profiles || profiles.length === 0) {
-        alert("Error al conectar con la base de datos de perfiles.");
-        return;
-      }
-
-      const queryLower = query.toLowerCase();
-      const profileData = profiles.find(p => {
-        const uName = (p.username || '').toLowerCase();
-        const fName = (p.name || '').toLowerCase();
-        const mail = (p.email || '').toLowerCase();
-        return uName.includes(queryLower) || fName.includes(queryLower) || mail.includes(queryLower);
-      });
-
-      if (profileData) {
-        currentFoundUser = profileData;
-        const displayName = profileData.username || profileData.name || profileData.email || 'Usuario';
-        document.getElementById('res-username').innerText = displayName;
-        document.getElementById('res-balance').innerText = Number(profileData.balance || 0).toLocaleString('es-VE');
-        document.getElementById('user-result-container').style.display = 'block';
-      } else {
-        alert("No se encontró ningún usuario con ese criterio de búsqueda.");
-        document.getElementById('user-result-container').style.display = 'none';
-        currentFoundUser = null;
-      }
-    }
-
-    async function modifyUserBalance(type) {
-      if (!currentFoundUser) {
-        alert("Primero debes buscar y seleccionar un usuario.");
-        return;
-      }
-
-      const amountInput = Number(document.getElementById('action-amount').value);
-      if (!amountInput || amountInput <= 0) {
-        alert("Ingresa un monto válido.");
-        return;
-      }
-
-      const currentBalance = Number(currentFoundUser.balance || 0);
-      let newBalance = currentBalance;
-      const targetName = currentFoundUser.username || currentFoundUser.name || currentFoundUser.email || 'usuario';
-
-      if (type === 'add') {
-        if (!confirm(`¿Sumar ${amountInput.toLocaleString('es-VE')} VES al saldo de ${targetName}?`)) return;
-        newBalance = currentBalance + amountInput;
-      } else {
-        if (currentBalance < amountInput) {
-          alert(`El usuario solo tiene ${currentBalance.toLocaleString('es-VE')} VES disponibles. No se puede descontar esa cantidad.`);
-          return;
-        }
-        if (!confirm(`¿Descontar ${amountInput.toLocaleString('es-VE')} VES del saldo de ${targetName}?`)) return;
-        newBalance = currentBalance - amountInput;
-      }
-
-      const { error } = await supabaseClient
+      const { data: profile, error: errProfile } = await supabaseClient
         .from('profiles')
-        .update({ balance: newBalance })
-        .eq('id', currentFoundUser.id);
-
-      if (error) {
-        alert("Error al actualizar el saldo: " + error.message);
-      } else {
-        alert("¡Saldo actualizado con éxito!");
-        document.getElementById('action-amount').value = '';
-        searchUserBalance(); 
-        loadData();
-      }
-    }
-
-    // ABRIR MODAL DE DEPÓSITO
-    function openDepositModal(depositId, userName, amount, method, reference, userPhone) {
-      activeDeposit = { 
-        id: depositId, 
-        user: userName, 
-        amount: amount, 
-        method: method, 
-        reference: reference 
-      };
-      
-      document.getElementById('modal-dep-user').innerText = userName || 'Usuario';
-      document.getElementById('modal-dep-method').innerText = method || 'Pago';
-      document.getElementById('modal-dep-ref').innerText = reference || 'N/A';
-      document.getElementById('modal-dep-amount').innerText = `${Number(amount).toLocaleString('es-VE')} VES`;
-      document.getElementById('input-dep-phone').value = userPhone || '';
-
-      document.getElementById('modal-deposit-overlay').style.display = 'flex';
-    }
-
-    function closeDepositModal() {
-      document.getElementById('modal-deposit-overlay').style.display = 'none';
-      activeDeposit = null;
-    }
-
-    // CONFIRMAR DEPÓSITO Y ENVIAR FACTURA POR WHATSAPP
-    async function confirmDepositAndSendInvoice() {
-      if (!activeDeposit) {
-        alert("Error: No hay ningún depósito activo seleccionado.");
-        return;
-      }
-
-      const currentDep = { ...activeDeposit };
-      const playerPhone = document.getElementById('input-dep-phone').value.trim();
-
-      const { error: depError } = await supabaseClient
-        .from('deposits')
-        .update({ status: 'Aprobado' })
-        .eq('id', currentDep.id);
-
-      if (depError) {
-        alert("Error al aprobar depósito: " + depError.message);
-        return;
-      }
-
-      const { data: depRecord } = await supabaseClient
-        .from('deposits')
-        .select('user_id, amount')
-        .eq('id', currentDep.id)
+        .select('balance')
+        .eq('id', userId)
         .single();
 
-      if (depRecord) {
-        let profileKey = String(depRecord.user_id).trim().toLowerCase();
-        let targetProfile = null;
-
-        for (let k in globalUserMap) {
-          if (k === profileKey || globalUserMap[k].id === depRecord.user_id) {
-            targetProfile = globalUserMap[k];
-            break;
-          }
-        }
-
-        if (targetProfile) {
-          const { data: currentProf } = await supabaseClient
-            .from('profiles')
-            .select('balance')
-            .eq('id', targetProfile.id)
-            .single();
-
-          const newBal = Number(currentProf?.balance || 0) + Number(depRecord.amount);
-          await supabaseClient
-            .from('profiles')
-            .update({ balance: newBal })
-            .eq('id', targetProfile.id);
-        }
+      if (errProfile || !profile) {
+        alert("Error al buscar el perfil del usuario.");
+        return;
       }
 
-      alert("¡Depósito aprobado y saldo acreditado con éxito!");
-      closeDepositModal();
+      const saldoActual = Number(profile.balance || 0);
+      const nuevoSaldo = saldoActual + Number(monto);
+
+      const { error: errUpdate } = await supabaseClient
+        .from('profiles')
+        .update({ balance: nuevoSaldo })
+        .eq('id', userId);
+
+      if (errUpdate) {
+        alert("Error al actualizar el saldo: " + errUpdate.message);
+        return;
+      }
+
+      const { error: errDep } = await supabaseClient
+        .from('deposits')
+        .update({ status: 'aprobado' })
+        .eq('id', depositId);
+
+      if (errDep) {
+        alert("Se acreditó el saldo pero hubo un error al actualizar el estado del depósito.");
+        return;
+      }
+
+      alert("✅ ¡Depósito aprobado y saldo acreditado con éxito al usuario!");
+
+      const mensajeFactura = `*GUSANOS ROYALE - COMPROBANTE DE RECARGA*%0A%0A¡Hola! Tu recarga ha sido *APROBADA* exitosamente.%0A%0A👤 *Usuario:* ${emailUsuario}%0A💰 *Monto Acreditado:* ${Number(monto).toLocaleString('es-VE')} VES%0A🔢 *Referencia:* ${referencia}%0A⚡ *Estado:* Acreditado a tu saldo disponible.%0A%0A¡Gracias por jugar en Gusanos Royale! 🐛`;
+      
+      window.open(`https://wa.me/?text=${mensajeFactura}`, '_blank');
       loadData();
-
-      if (playerPhone) {
-        const msg = `🧾 *FACTURA / RECIBO DE PAGO - GUSANOS ROYALE*\n\n` +
-                    `¡Hola *${currentDep.user}*! Tu depósito ha sido *APROBADO* exitosamente.\n\n` +
-                    `• *Método:* ${currentDep.method}\n` +
-                    `• *Referencia:* ${currentDep.reference}\n` +
-                    `• *Monto Acreditado:* ${Number(currentDep.amount).toLocaleString('es-VE')} VES\n\n` +
-                    `¡Ya puedes entrar a la plataforma y disfrutar de las salas de juego! 🚀🎮`;
-        
-        const waUrl = `https://api.whatsapp.com/send?phone=${playerPhone}&text=${encodeURIComponent(msg)}`;
-        window.open(waUrl, '_blank');
-      }
     }
 
-    // ABRIR MODAL DE RETIRO
-    function openWithdrawalModal(withdrawalId, userName, amount, accountDetails, userPhone) {
-      activeWithdrawal = { 
-        id: withdrawalId, 
-        user: userName, 
-        amount: amount, 
-        account: accountDetails 
-      };
+    // --- FUNCIÓN PARA RECHAZAR DEPÓSITO ---
+    async function rechazarDeposito(depositId) {
+      if (!confirm("¿Estás seguro de rechazar este depósito?")) return;
 
-      document.getElementById('modal-user-display').innerText = userName || 'Usuario';
-      document.getElementById('modal-account-display').innerText = accountDetails || 'N/A';
-      document.getElementById('modal-requested-amount').innerText = `${Number(amount).toLocaleString('es-VE')} VES`;
-      
-      document.getElementById('input-commission-rate').value = 0;
+      const { error } = await supabaseClient
+        .from('deposits')
+        .update({ status: 'rechazado' })
+        .eq('id', depositId);
+
+      if (error) {
+        alert("Error al rechazar el depósito: " + error.message);
+        return;
+      }
+
+      alert("❌ Depósito rechazado.");
+      loadData();
+    }
+
+    // --- GESTIÓN DE RETIROS ---
+    function openWithdrawalModal(id, userId, amount, account, phone) {
+      activeWithdrawal = { id, userId, amount, account };
+      document.getElementById('modal-user-display').innerText = userId;
+      document.getElementById('modal-account-display').innerText = account;
+      document.getElementById('modal-requested-amount').innerText = Number(amount).toLocaleString('es-VE') + ' VES';
+      document.getElementById('input-user-phone').value = phone || '';
       document.getElementById('input-bank-reference').value = '';
-      document.getElementById('input-user-phone').value = userPhone || '';
-
       recalculateWithdrawalModal();
       document.getElementById('modal-withdrawal-overlay').style.display = 'flex';
     }
@@ -948,122 +806,168 @@
       if (!activeWithdrawal) return;
       const rate = Number(document.getElementById('input-commission-rate').value) || 0;
       const requested = Number(activeWithdrawal.amount);
-      
-      const feeAmount = (requested * rate) / 100;
-      const netAmount = requested - feeAmount;
+      const fee = (requested * rate) / 100;
+      const net = requested - fee;
 
       document.getElementById('modal-fee-percent').innerText = rate;
-      document.getElementById('modal-fee-amount').innerText = `${feeAmount.toLocaleString('es-VE')} VES`;
-      document.getElementById('modal-net-amount').innerText = `${netAmount.toLocaleString('es-VE')} VES`;
+      document.getElementById('modal-fee-amount').innerText = fee.toLocaleString('es-VE') + ' VES';
+      document.getElementById('modal-net-amount').innerText = net.toLocaleString('es-VE') + ' VES';
     }
 
-    // CONFIRMAR RETIRO Y ENVIAR FACTURA POR WHATSAPP
     async function confirmWithdrawalAndSendInvoice() {
-      if (!activeWithdrawal) {
-        alert("Error: No hay ninguna solicitud de retiro activa seleccionada.");
-        return;
-      }
-
-      const currentWith = { ...activeWithdrawal };
-      const refNum = document.getElementById('input-bank-reference').value.trim();
-      const playerPhone = document.getElementById('input-user-phone').value.trim();
+      if (!activeWithdrawal) return;
+      const ref = document.getElementById('input-bank-reference').value.trim();
+      const phone = document.getElementById('input-user-phone').value.trim();
       const rate = Number(document.getElementById('input-commission-rate').value) || 0;
+      const requested = Number(activeWithdrawal.amount);
+      const fee = (requested * rate) / 100;
+      const net = requested - fee;
 
-      if (!refNum) {
-        alert("Por favor ingresa el número de referencia bancaria del pago móvil realizado.");
+      if (!ref) {
+        alert("Por favor ingresa el número de referencia bancaria del pago móvil.");
         return;
       }
-
-      const requested = Number(currentWith.amount);
-      const feeAmount = (requested * rate) / 100;
-      const netAmount = requested - feeAmount;
 
       const { error } = await supabaseClient
         .from('withdrawals')
         .update({ status: 'Aprobado' })
-        .eq('id', currentWith.id);
+        .eq('id', activeWithdrawal.id);
 
       if (error) {
-        alert("Error al procesar el retiro: " + error.message);
+        alert("Error al actualizar el retiro: " + error.message);
         return;
       }
 
-      alert("¡Retiro aprobado con éxito!");
+      alert("✅ ¡Retiro aprobado con éxito!");
       closeWithdrawalModal();
-      loadData();
 
-      if (playerPhone) {
-        const msg = `🧾 *COMPROBANTE DE RETIRO - GUSANOS ROYALE*\n\n` +
-                    `¡Hola *${currentWith.user}*! Tu solicitud de retiro ha sido pagada y *APROBADA*.\n\n` +
-                    `• *Monto Solicitado:* ${requested.toLocaleString('es-VE')} VES\n` +
-                    (rate > 0 ? `• *Comisión (${rate}%):* -${feeAmount.toLocaleString('es-VE')} VES\n` : '') +
-                    `• *Monto Depositado:* ${netAmount.toLocaleString('es-VE')} VES\n` +
-                    `• *Ref. Pago Móvil:* ${refNum}\n\n` +
-                    `¡Gracias por jugar en Gusanos Royale! 🚀🔥`;
-
-        const waUrl = `https://api.whatsapp.com/send?phone=${playerPhone}&text=${encodeURIComponent(msg)}`;
-        window.open(waUrl, '_blank');
+      const mensajeFactura = `*GUSANOS ROYALE - COMPROBANTE DE RETIRO*%0A%0A¡Hola! Tu solicitud de retiro ha sido *APROBADA* y pagada.%0A%0A💰 *Monto Solicitado:* ${requested.toLocaleString('es-VE')} VES%0A📉 *Comisión (${rate}%):* ${fee.toLocaleString('es-VE')} VES%0A💵 *Monto Neto Depositado:* ${net.toLocaleString('es-VE')} VES%0A🔢 *Referencia Bancaria:* ${ref}%0A%0A¡Gracias por jugar en Gusanos Royale! 🐛`;
+      
+      if (phone) {
+        window.open(`https://wa.me/${phone}?text=${mensajeFactura}`, '_blank');
+      } else {
+        window.open(`https://wa.me/?text=${mensajeFactura}`, '_blank');
       }
+
+      loadData();
     }
 
-    // GESTIÓN DE PROMOTORES
-    async function loadPromotoresData() {
-      const { data: reports } = await supabaseClient.from('promoter_reports').select('*').order('created_at', { ascending: false });
-      const body = document.getElementById('promoter-reports-table-body');
+    async function rejectTransaction(table, id) {
+      if (!confirm("¿Estás seguro de rechazar esta solicitud?")) return;
+      const { error } = await supabaseClient
+        .from(table)
+        .update({ status: 'Rechazado' })
+        .eq('id', id);
 
-      if (reports && reports.length > 0) {
-        body.innerHTML = reports.map(r => `
+      if (error) {
+        alert("Error al rechazar: " + error.message);
+        return;
+      }
+      alert("❌ Solicitud rechazada.");
+      loadData();
+    }
+
+    // --- BUSCADOR SEGURO DE USUARIOS EN SUPABASE ---
+    async function searchUserBalance() {
+      const query = document.getElementById('search-user-input').value.trim();
+      if (!query) {
+        alert("Por favor ingresa un nombre de usuario o correo para buscar.");
+        return;
+      }
+
+      // Buscamos primero por username
+      let { data, error } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .ilike('username', `%${query}%`);
+
+      // Si no encuentra nada por username, intentamos por email
+      if (!data || data.length === 0) {
+        const resEmail = await supabaseClient
+          .from('profiles')
+          .select('*')
+          .ilike('email', `%${query}%`);
+        data = resEmail.data;
+      }
+
+      if (!data || data.length === 0) {
+        alert("No se encontró ningún usuario con ese criterio en Supabase.");
+        document.getElementById('user-result-container').style.display = 'none';
+        return;
+      }
+
+      // Tomamos el primer resultado encontrado
+      currentFoundUser = data[0];
+      const nombreMostrar = currentFoundUser.username || currentFoundUser.email || 'Usuario';
+
+      document.getElementById('res-username').innerText = nombreMostrar;
+      document.getElementById('res-balance').innerText = Number(currentFoundUser.balance || 0).toLocaleString('es-VE');
+      document.getElementById('user-result-container').style.display = 'block';
+    }
+    async function modifyUserBalance(action) {
+      if (!currentFoundUser) return;
+      const amountInput = Number(document.getElementById('action-amount').value);
+      if (!amountInput || amountInput <= 0) {
+        alert("Ingresa un monto válido.");
+        return;
+      }
+
+      const currentBalance = Number(currentFoundUser.balance || 0);
+      const newBalance = action === 'add' ? currentBalance + amountInput : currentBalance - amountInput;
+
+      const { error } = await supabaseClient
+        .from('profiles')
+        .update({ balance: newBalance })
+        .eq('id', currentFoundUser.id);
+
+      if (error) {
+        alert("Error al actualizar el saldo: " + error.message);
+        return;
+      }
+
+      alert(`✅ Saldo actualizado con éxito. Nuevo balance: ${newBalance.toLocaleString('es-VE')} VES`);
+      currentFoundUser.balance = newBalance;
+      document.getElementById('res-balance').innerText = newBalance.toLocaleString('es-VE');
+      document.getElementById('action-amount').value = '';
+      loadData();
+    }
+
+    async function loadPromotoresData() {
+      const { data } = await supabaseClient.from('promotores').select('*');
+      const tbody = document.getElementById('promoter-reports-table-body');
+      if (data && data.length > 0) {
+        tbody.innerHTML = data.map(p => `
           <tr>
-            <td>${r.promoter_code || 'Promotor'}</td>
-            <td>${r.user_id || 'Usuario'}</td>
-            <td style="color: #22c55e;">+${Number(r.amount || 100).toLocaleString('es-VE')} VES</td>
-            <td><span class="badge badge-${r.status || 'Pendiente'}">${r.status || 'Pendiente'}</span></td>
-            <td>
-              ${r.status === 'Pendiente' ? `
-                <button class="btn-approve" onclick="aprobarPromotorReport('${r.id}')">Aprobar Comisión</button>
-              ` : '<span style="color:#64748b;">Aprobado</span>'}
-            </td>
+            <td>${p.nombre}</td>
+            <td>${p.correo || 'N/A'}</td>
+            <td>${p.codigo || 'N/A'}</td>
+            <td><span class="badge badge-Aprobado">Activo</span></td>
+            <td>-</td>
           </tr>
         `).join('');
-      } else {
-        body.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #64748b;">No hay reportes pendientes de promotores.</td></tr>`;
       }
     }
 
     async function crearPromotor(e) {
       e.preventDefault();
-      const nombre = document.getElementById('p_nombre').value.trim();
-      const cedula = document.getElementById('p_cedula').value.trim();
-      const telefono = document.getElementById('p_telefono').value.trim();
-      const correo = document.getElementById('p_correo').value.trim();
-      const codigo = document.getElementById('p_codigo').value.trim();
+      const nombre = document.getElementById('p_nombre').value;
+      const cedula = document.getElementById('p_cedula').value;
+      const telefono = document.getElementById('p_telefono').value;
+      const correo = document.getElementById('p_correo').value;
+      const codigo = document.getElementById('p_codigo').value;
 
-      const { error } = await supabaseClient.from('promoters').insert([{
-        nombre, cedula, telefono, correo, codigo_promotor: codigo, created_at: new Date()
-      }]);
-
+      const { error } = await supabaseClient.from('promotores').insert([{ nombre, cedula, telefono, correo, codigo }]);
       if (error) {
-        alert("Error al registrar promotor: " + error.message);
-      } else {
-        alert("¡Promotor registrado con éxito!");
-        document.getElementById('form-crear-promotor').reset();
+        alert("Error al crear promotor: " + error.message);
+        return;
       }
+      alert("✅ Promotor registrado con éxito.");
+      document.getElementById('form-crear-promotor').reset();
+      loadPromotoresData();
     }
 
-    async function aprobarPromotorReport(reportId) {
-      if (!confirm("¿Aprobar esta comisión para el promotor?")) return;
-      const { error } = await supabaseClient.from('promoter_reports').update({ status: 'Aprobado' }).eq('id', reportId);
-      if (error) {
-        alert("Error: " + error.message);
-      } else {
-        alert("¡Comisión aprobada con éxito!");
-        loadPromotoresData();
-      }
-    }
-
+    // Inicializar datos al cargar la página
     loadData();
-    loadPromotoresData();
-    chequearEstadoComida();
   </script>
 </body>
 </html>

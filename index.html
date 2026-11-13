@@ -228,6 +228,34 @@
       console.error("Error al inicializar Supabase:", e);
     }
 
+    // ==========================================
+    // CONTROL DE SESIÓN ÚNICA (VENTANA DE 5 MINUTOS)
+    // ==========================================
+    async function verificarSesionActiva(userId) {
+      if (!supabaseClient) return true;
+
+      const { data: profile, error } = await supabaseClient
+        .from('profiles')
+        .select('last_seen')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error || !profile) return true;
+
+      const ahora = Date.now();
+      const ultimaVez = profile.last_seen ? new Date(profile.last_seen).getTime() : 0;
+      const diferenciaMinutos = (ahora - ultimaVez) / (1000 * 60);
+
+      // Si la última señal fue hace MENOS de 5 minutos, la sesión sigue considerada activa
+      if (ultimaVez > 0 && diferenciaMinutos < 5) {
+        const minutosRestantes = Math.ceil(5 - diferenciaMinutos);
+        alert(`⚠️ ¡Ya tienes una sesión activa en otra ventana o dispositivo! Si saliste sin cerrar sesión, por favor espera aproximadamente ${minutosRestantes} minuto(s) para volver a ingresar.`);
+        return false; // Bloquea la entrada
+      }
+
+      return true; // Permite la entrada
+    }
+
     let isRegistering = false;
 
     function toggleMode() {
@@ -325,9 +353,26 @@
           const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
           if (error) throw error;
 
+          const userId = data.user.id;
+
+          // 1. Verificar si ya existe otra sesión activa en los últimos 5 minutos
+          const puedeEntrar = await verificarSesionActiva(userId);
+          if (!puedeEntrar) {
+            await supabaseClient.auth.signOut(); // Cerramos la sesión local para no dejar rastro
+            return;
+          }
+
+          // 2. Marcar de inmediato la sesión actual como activa en Supabase
+          await supabaseClient
+            .from('profiles')
+            .update({ last_seen: new Date().toISOString() })
+            .eq('id', userId);
+
           alert("¡Bienvenido de vuelta!");
           
           const userNick = email.split('@')[0];
+          localStorage.setItem('user_id', userId);
+          localStorage.setItem('user_email', email);
           localStorage.setItem('player_name', userNick);
           localStorage.setItem('selected_entry', '100');
 

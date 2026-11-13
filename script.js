@@ -47,6 +47,8 @@ resizeCanvas();
 
 let selectedEntryFee = parseInt(localStorage.getItem('selected_entry')) || 100;
 let selectedSkin = localStorage.getItem('selected_skin') || 've';
+// Capturamos el color guardado en el selector de la interfaz (o asignamos uno por defecto)
+let selectedColor = localStorage.getItem('worm_color') || '#22c55e';
 let playerName = localStorage.getItem('player_name') || 'Jugador';
 let gameActive = true;
 let currentPhase = 'PREPARATION';
@@ -86,8 +88,6 @@ async function descontarEntradaEnSupabase() {
     saveSecureBalance(nuevoSaldo);
   }
 }
-
-descontarEntradaEnSupabase();
 
 const mouse = { x: canvas.width / 2, y: canvas.height / 2 };
 let isBoosting = false;
@@ -134,7 +134,6 @@ let arenaFoodOrbs = [];
 
 const roomChannelName = `arena_ves_${selectedEntryFee}`;
 
-// Inicialización oficial de Socket.io conectada al servidor de Render
 let socket = null;
 if (typeof io !== 'undefined') {
   socket = io('https://gusano-royale.onrender.com');
@@ -197,6 +196,7 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
         p.targetAngle = payload.angle;
         p.ves = payload.ves;
         p.skinId = payload.skinId;
+        p.color = payload.color; // Sincronizamos el color remoto
         p.targetBody = payload.body;
       }
       remotePlayers[payload.id].lastUpdate = Date.now();
@@ -242,6 +242,7 @@ let player = {
   length: 20,
   ves: selectedEntryFee, 
   skinId: selectedSkin,
+  color: selectedColor, // ¡Inyectamos aquí el color seleccionado por el usuario!
   alive: true
 };
 
@@ -363,6 +364,7 @@ function updateLocalPlayer() {
           angle: player.angle,
           ves: player.ves,
           skinId: player.skinId,
+          color: player.color, // Enviamos el color actual en la red
           body: player.body.slice(0, 15)
         }
       });
@@ -388,7 +390,6 @@ function drawPlayer(p, camera, isLocal = false) {
         p.y += (p.targetY - p.y) * 0.1;
       }
     }
-
     if (p.targetBody && Array.isArray(p.targetBody)) {
       if (!p.body || p.body.length === 0) {
         p.body = JSON.parse(JSON.stringify(p.targetBody));
@@ -419,7 +420,8 @@ function drawPlayer(p, camera, isLocal = false) {
       else if (i % 3 === 1) ctx.fillStyle = '#00247d';
       else ctx.fillStyle = '#cf142b';
     } else {
-      ctx.fillStyle = isLocal ? '#22c55e' : '#38bdf8';
+      // Priorizamos el color del objeto (p.color), luego localStorage, y por último respaldos
+      ctx.fillStyle = p.color || localStorage.getItem('worm_color') || (isLocal ? '#22c55e' : '#38bdf8');
     }
     ctx.fill();
   }
@@ -590,18 +592,15 @@ async function endGame(survived, reason) {
   const finalAmount = survived ? Math.floor(player.ves) : 0;
 
   if (survived && finalAmount > 0) {
-    // 1. Guardamos localmente primero de forma segura
     let savedBalance = getSecureBalance();
     savedBalance += finalAmount;
     saveSecureBalance(savedBalance);
 
-    // 2. ACTUALIZAMOS EN SUPABASE DE FORMA SEGURA
     if (typeof supabaseClient !== 'undefined' && supabaseClient) {
       const userId = localStorage.getItem('user_id');
       const userEmail = localStorage.getItem('user_email');
 
       if (userId || userEmail) {
-        // Primero consultamos el balance actual exacto
         let query = supabaseClient.from('profiles').select('id, balance');
         if (userId) {
           query = query.eq('id', userId);
@@ -615,7 +614,6 @@ async function endGame(survived, reason) {
           const balanceActualServidor = Number(profile.balance || 0);
           const nuevoBalanceServidor = balanceActualServidor + finalAmount;
 
-          // Actualizamos usando el ID exacto del perfil encontrado
           const { error: errUpdate } = await supabaseClient
             .from('profiles')
             .update({ balance: nuevoBalanceServidor })
@@ -633,7 +631,6 @@ async function endGame(survived, reason) {
     }
   }
 
-  // Actualizamos los textos del modal de fin de juego
   if (survived) {
     if (endTitle) { endTitle.innerText = "¡VICTORIA REAL!"; endTitle.style.color = "#4ade80"; }
     if (endDesc) endDesc.innerText = reason;
