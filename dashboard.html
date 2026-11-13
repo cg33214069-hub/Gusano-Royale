@@ -1133,33 +1133,104 @@
       }
     }
 
-    async function submitWithdrawal() {
-      const amountInput = document.getElementById('withdraw-amount').value;
-      const selectElement = document.getElementById('saved-accounts-select').value;
-      const amount = parseFloat(amountInput);
+   async function submitWithdrawal() {
+  const amountInput = document.getElementById('withdraw-amount').value;
+  const selectElement = document.getElementById('saved-accounts-select').value;
+  const amount = parseFloat(amountInput);
 
-      if (!amount || amount <= 0) {
-        alert("Por favor ingresa un monto válido a retirar.");
-        return;
-      }
-      if (!selectElement) {
-        alert("Por favor selecciona una cuenta bancaria guardada.");
-        return;
-      }
+  if (!amount || amount <= 0) {
+    alert("Por favor ingresa un monto válido a retirar.");
+    return;
+  }
+  if (!selectElement) {
+    alert("Por favor selecciona una cuenta bancaria guardada.");
+    return;
+  }
 
-      alert("Solicitud de retiro enviada correctamente. Se procesará vía Pago Móvil.");
+  // Verificamos si existe el cliente de Supabase
+  if (typeof supabaseClient === 'undefined' || !supabaseClient) {
+    alert("Error de conexión con la base de datos.");
+    return;
+  }
+
+  const userId = localStorage.getItem('user_id');
+  const userEmail = localStorage.getItem('user_email');
+
+  if (!userId && !userEmail) {
+    alert("No se encontró la sesión del usuario. Por favor vuelve a iniciar sesión.");
+    return;
+  }
+
+  try {
+    // 1. Consultamos el perfil para verificar saldo actual
+    let query = supabaseClient.from('profiles').select('id, balance');
+    if (userId) {
+      query = query.eq('id', userId);
+    } else {
+      query = query.eq('email', userEmail);
     }
 
-    function logout() {
-      localStorage.clear();
-      window.location.href = 'index.html';
+    const { data: profile, error: errFetch } = await query.maybeSingle();
+
+    if (errFetch || !profile) {
+      alert("No se pudo verificar tu saldo en el servidor.");
+      return;
     }
 
-    window.onload = () => {
-      loadUserData();
-      renderSkins();
-      selectPaymentMethod('pago_movil');
-    };
-  </script>
-</body>
-</html>
+    const saldoActual = Number(profile.balance || 0);
+
+    if (saldoActual < amount) {
+      alert("No tienes suficiente saldo disponible para este retiro.");
+      return;
+    }
+
+    const nuevoSaldo = saldoActual - amount;
+
+    // 2. Insertamos la solicitud en la tabla withdrawals de Supabase
+    const { error: errInsert } = await supabaseClient
+      .from('withdrawals')
+      .insert([
+        { 
+          user_id: profile.id, 
+          monto: amount, 
+          cuenta_bancaria: selectElement, 
+          estado: 'pendiente',
+          fecha: new Date().toISOString()
+        }
+      ]);
+
+    if (errInsert) {
+      console.error("Error al registrar retiro:", errInsert.message);
+      alert("Hubo un error al registrar la solicitud en el sistema.");
+      return;
+    }
+
+    // 3. Actualizamos el saldo restante en la tabla profiles de Supabase
+    const { error: errUpdate } = await supabaseClient
+      .from('profiles')
+      .update({ balance: nuevoSaldo })
+      .eq('id', profile.id);
+
+    if (errUpdate) {
+      console.error("Error al actualizar saldo:", errUpdate.message);
+      alert("Se creó la solicitud pero hubo un problema al actualizar tu saldo.");
+      return;
+    }
+
+    // 4. Actualizamos el saldo local seguro en el navegador
+    if (typeof saveSecureBalance === 'function') {
+      saveSecureBalance(nuevoSaldo);
+    } else {
+      localStorage.setItem('user_balance', nuevoSaldo.toString());
+    }
+
+    alert("¡Solicitud de retiro enviada correctamente. Se procesará vía Pago Móvil.");
+    
+    // Recargamos la página para reflejar el descuento del saldo en pantalla
+    location.reload();
+
+  } catch (err) {
+    console.error("Error inesperado en retiro:", err);
+    alert("Ocurrió un error inesperado al procesar el retiro.");
+  }
+}

@@ -574,7 +574,7 @@ startTimer();
 requestAnimationFrame(gameLoop);
 
 // ==========================================
-// FUNCIÓN CORREGIDA PARA GUARDAR EL PREMIO EN SUPABASE
+// FUNCIÓN ENDGAME OPTIMIZADA PARA GUARDAR EL PREMIO
 // ==========================================
 async function endGame(survived, reason) {
   gameActive = false;
@@ -590,17 +590,18 @@ async function endGame(survived, reason) {
   const finalAmount = survived ? Math.floor(player.ves) : 0;
 
   if (survived && finalAmount > 0) {
-    // 1. Guardamos localmente con el sistema seguro
+    // 1. Guardamos localmente primero de forma segura
     let savedBalance = getSecureBalance();
     savedBalance += finalAmount;
     saveSecureBalance(savedBalance);
 
-    // 2. ACTUALIZAMOS DIRECTAMENTE EL SALDO EN LA BASE DE DATOS DE SUPABASE
+    // 2. ACTUALIZAMOS EN SUPABASE DE FORMA SEGURA
     if (typeof supabaseClient !== 'undefined' && supabaseClient) {
       const userId = localStorage.getItem('user_id');
       const userEmail = localStorage.getItem('user_email');
 
       if (userId || userEmail) {
+        // Primero consultamos el balance actual exacto
         let query = supabaseClient.from('profiles').select('id, balance');
         if (userId) {
           query = query.eq('id', userId);
@@ -614,22 +615,25 @@ async function endGame(survived, reason) {
           const balanceActualServidor = Number(profile.balance || 0);
           const nuevoBalanceServidor = balanceActualServidor + finalAmount;
 
+          // Actualizamos usando el ID exacto del perfil encontrado
           const { error: errUpdate } = await supabaseClient
             .from('profiles')
             .update({ balance: nuevoBalanceServidor })
             .eq('id', profile.id);
 
           if (errUpdate) {
-            console.error("❌ Error al actualizar la ganancia en Supabase:", errUpdate.message);
+            console.error("❌ Error de Supabase al sumar la ganancia:", errUpdate.message);
           } else {
-            console.log("✅ ¡Ganancia acreditada con éxito en Supabase!");
+            console.log("✅ ¡Ganancia de", finalAmount, "VES sumada con éxito en Supabase!");
           }
+        } else {
+          console.error("❌ No se pudo encontrar el perfil en Supabase para actualizar el premio.");
         }
       }
     }
   }
 
-  // Si sobrevive o muere, actualizamos los textos del modal
+  // Actualizamos los textos del modal de fin de juego
   if (survived) {
     if (endTitle) { endTitle.innerText = "¡VICTORIA REAL!"; endTitle.style.color = "#4ade80"; }
     if (endDesc) endDesc.innerText = reason;
