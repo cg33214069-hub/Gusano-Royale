@@ -228,30 +228,7 @@
       console.error("Error al inicializar Supabase:", e);
     }
 
-    async function verificarSesionActiva(userId) {
-      if (!supabaseClient) return true;
-
-      const { data: profile, error } = await supabaseClient
-        .from('profiles')
-        .select('last_seen')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (error || !profile) return true;
-
-      const ahora = Date.now();
-      const ultimaVez = profile.last_seen ? new Date(profile.last_seen).getTime() : 0;
-      const diferenciaSegundos = (ahora - ultimaVez) / 1000;
-
-      // Reducimos el margen a solo 60 segundos (1 minuto) para pruebas y agilidad
-      if (ultimaVez > 0 && diferenciaSegundos < 60) {
-        const segundosRestantes = Math.ceil(60 - diferenciaSegundos);
-        alert(`⚠️ Ya tienes una sesión activa reciente. Por favor espera ${segundosRestantes} segundos para volver a ingresar.`);
-        return false; 
-      }
-
-      return true; 
-    }
+    
     let isRegistering = false;
 
     function toggleMode() {
@@ -349,21 +326,7 @@
           const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
           if (error) throw error;
 
-          const userId = data.user.id;
-
-          // 1. Verificar si ya existe otra sesión activa en los últimos 5 minutos
-          const puedeEntrar = await verificarSesionActiva(userId);
-          if (!puedeEntrar) {
-            await supabaseClient.auth.signOut(); // Cerramos la sesión local para no dejar rastro
-            return;
-          }
-
-          // 2. Marcar de inmediato la sesión actual como activa en Supabase
-          await supabaseClient
-            .from('profiles')
-            .update({ last_seen: new Date().toISOString() })
-            .eq('id', userId);
-
+  
           alert("¡Bienvenido de vuelta!");
           
           const userNick = email.split('@')[0];
