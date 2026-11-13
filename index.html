@@ -330,7 +330,7 @@
           alert("¡Bienvenido de vuelta!");
           
           const userNick = email.split('@')[0];
-          localStorage.setItem('user_id', userId);
+          localStorage.setItem('user_id', data.user.id);
           localStorage.setItem('user_email', email);
           localStorage.setItem('player_name', userNick);
           localStorage.setItem('selected_entry', '100');
