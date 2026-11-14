@@ -25,7 +25,28 @@ function saveSecureBalance(amount) {
 // ==========================================
 // 1. CONFIGURACIÓN DEL MUNDO Y COMIDA EN EL MAPA
 // ==========================================
-const WORLD_SIZE = 3000;
+let WORLD_SIZE = 2500; // Valor por defecto inicial
+
+// ==========================================
+// FUNCIÓN PARA LEER EL TAMAÑO GLOBAL DEL MAPA DESDE SUPABASE
+// ==========================================
+async function cargarTamanoMapaGlobal() {
+  if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+
+  const { data, error } = await supabaseClient
+    .from('game_config')
+    .select('map_size')
+    .eq('id', 1)
+    .single();
+
+  if (data && data.map_size) {
+    WORLD_SIZE = data.map_size;
+    console.log(`🗺️ Tamaño de mapa global cargado desde Supabase: ${WORLD_SIZE}x${WORLD_SIZE}`);
+  }
+}
+
+// Ejecutamos la consulta al iniciar el script
+cargarTamanoMapaGlobal();
 const PREPARATION_TIME = 10; 
 const COMBAT_TIME = 60;      
 
@@ -35,6 +56,7 @@ const minimapCanvas = document.getElementById('minimap');
 const mCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
 
 function resizeCanvas() {
+  if (!canvas) return;
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
   if (minimapCanvas) {
@@ -44,6 +66,7 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
+
 
 let selectedEntryFee = parseInt(localStorage.getItem('selected_entry')) || 100;
 let selectedSkin = localStorage.getItem('selected_skin') || 've';
