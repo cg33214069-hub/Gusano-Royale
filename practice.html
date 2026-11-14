@@ -112,28 +112,54 @@
   const COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
   let gameState = 'PREP'; // 'PREP' (10s) -> 'COMBAT' (60s) -> 'ENDED'
-  let timeLeft = 10;
-  let worms = [];
-  let foods = [];
-  let pointer = { x: canvas.width / 2, y: canvas.height / 2, boosting: false };
+    let timeLeft = 10;
+    let worms = [];
+    let foods = [];
+    let pointer = { x: canvas.width / 2, y: canvas.height / 2, boosting: false };
 
-  // Controles Mouse y Táctil
-  window.addEventListener('mousemove', (e) => { pointer.x = e.clientX; pointer.y = e.clientY; });
-  window.addEventListener('mousedown', () => pointer.boosting = true);
-  window.addEventListener('mouseup', () => pointer.boosting = false);
-  
-  window.addEventListener('touchmove', (e) => {
-    pointer.x = e.touches[0].clientX;
-    pointer.y = e.touches[0].clientY;
-  });
-  window.addEventListener('touchstart', () => pointer.boosting = true);
-  window.addEventListener('touchend', () => pointer.boosting = false);
+    // 1. EL RATÓN Y EL TÁCTIL SOLO CAMBIAN LA DIRECCIÓN (NO ACELERAN)
+    window.addEventListener('mousemove', (e) => { 
+      pointer.x = e.clientX; 
+      pointer.y = e.clientY; 
+    });
 
-  const boostBtn = document.getElementById('boost-btn');
-  if (boostBtn) {
-    boostBtn.addEventListener('touchstart', (e) => { e.preventDefault(); pointer.boosting = true; });
-    boostBtn.addEventListener('touchend', (e) => { e.preventDefault(); pointer.boosting = false; });
-  }
+    window.addEventListener('touchmove', (e) => {
+      pointer.x = e.touches[0].clientX;
+      pointer.y = e.touches[0].clientY;
+    });
+
+    // 2. CONTROL DE TECLADO EN PC (Barra Espaciadora para Turbo)
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        pointer.boosting = true;
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') {
+        pointer.boosting = false;
+      }
+    });
+
+    // 3. BOTÓN TÁCTIL DE TURBO EN CELULAR (Solo activa el turbo al presionarlo)
+    const boostBtn = document.getElementById('boost-btn');
+    if (boostBtn) {
+      boostBtn.addEventListener('touchstart', (e) => { 
+        e.preventDefault(); 
+        pointer.boosting = true; 
+      });
+      boostBtn.addEventListener('touchend', (e) => { 
+        e.preventDefault(); 
+        pointer.boosting = false; 
+      });
+      // Soporte por si acaso hacen clic en el botón con mouse en PC
+      boostBtn.addEventListener('mousedown', (e) => { 
+        pointer.boosting = true; 
+      });
+      boostBtn.addEventListener('mouseup', (e) => { 
+        pointer.boosting = false; 
+      });
+    }
 
   class Worm {
     constructor(id, name, isPlayer, x, y, color) {
@@ -247,7 +273,7 @@
         this.aiTimer = 30;
       }
     }
-    
+
     draw(camX, camY) {
       if (!this.alive) return;
       for (let i = this.segments.length - 1; i >= 0; i--) {
