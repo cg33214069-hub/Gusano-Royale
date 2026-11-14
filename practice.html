@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gusanos Royale - Sala de Práctica (Bots)</title>
+  
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    body, html { width: 100%; height: 100%; overflow: hidden; background-color: #0b0f19; font-family: 'Segoe UI', sans-serif; color: #fff; touch-action: none; }
+    #game-container { position: relative; width: 100vw; height: 100vh; }
+    canvas { display: block; background: radial-gradient(circle, #121829 0%, #080b12 100%); }
+
+    .hud-bar {
+      position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 20px; background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1); padding: 10px 24px;
+      border-radius: 50px; backdrop-filter: blur(8px); z-index: 10;
+    }
+    .hud-item { display: flex; flex-direction: column; align-items: center; }
+    .hud-label { font-size: 0.7rem; text-transform: uppercase; color: #94a3b8; }
+    .hud-value { font-size: 1.2rem; font-weight: 800; color: #38bdf8; }
+    .hud-value.ves { color: #4ade80; }
+    .hud-value.timer { color: #fbbf24; }
+    .hud-value.alive { color: #f43f5e; }
+
+    #phase-banner {
+      position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+      background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #fbbf24;
+      padding: 6px 20px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; z-index: 10;
+      text-align: center; max-width: 90%;
+    }
+
+    #leave-btn {
+      position: absolute; top: 15px; left: 15px; background: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; z-index: 10;
+    }
+
+    /* Botón de Turbo / Impulso táctil para Celular */
+    #boost-btn {
+      position: absolute; bottom: 30px; right: 30px; width: 80px; height: 80px;
+      background: rgba(239, 68, 68, 0.35); border: 2px solid #ef4444; border-radius: 50%;
+      color: #fff; font-size: 0.75rem; font-weight: bold; display: flex; justify-content: center;
+      align-items: center; z-index: 10; cursor: pointer; backdrop-filter: blur(4px);
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); text-transform: uppercase;
+    }
+    @media (min-width: 768px) {
+      #boost-btn { display: none; }
+    }
+
+    #minimap { display: none; }
+
+    .modal-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(8, 11, 18, 0.92); display: flex; justify-content: center; align-items: center; z-index: 100;
+    }
+    .modal {
+      background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.1); padding: 25px;
+      border-radius: 20px; max-width: 420px; width: 90%; text-align: center;
+    }
+    .modal h2 { font-size: 1.8rem; margin-bottom: 10px; color: #f59e0b; }
+    .btn-primary { background: #238636; color: #fff; border: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
+    .btn-secondary { background: #30363d; color: #fff; border: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; }
+  </style>
+</head>
+<body>
+
+<div id="game-container">
+  <button id="leave-btn" onclick="volverAlDashboard()">Salir al Dashboard</button>
+
+  <div class="hud-bar">
+    <div class="hud-item"><span class="hud-label" id="timer-label">Preparación</span><span class="hud-value timer" id="timer-display">00:10</span></div>
+    <div class="hud-item"><span class="hud-label">Botín Simulado</span><span class="hud-value ves" id="ves-display">0 VES</span></div>
+    <div class="hud-item"><span class="hud-label">Vivos (Bots)</span><span class="hud-value alive" id="alive-display">12 / 12</span></div>
+  </div>
+
+  <div id="phase-banner">🟢 MODO PRÁCTICA: Bot Activo • Entrena sin arriesgar dinero real</div>
+
+  <canvas id="gameCanvas"></canvas>
+  <canvas id="minimap"></canvas>
+
+  <button id="boost-btn">TURBO</button>
+
+  <!-- Modal de Fin de Partida -->
+  <div class="modal-overlay" id="end-modal" style="display: none;">
+    <div class="modal">
+      <h2 id="end-title">FIN DE LA PRÁCTICA</h2>
+      <p id="end-desc" style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 15px;">Has completado tu entrenamiento con bots.</p>
+      <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin: 20px 0;">
+        <div style="font-size: 0.8rem; color: #94a3b8;">GANANCIA SIMULADA</div>
+        <div style="font-size: 2rem; font-weight: 800; color: #4ade80;" id="end-ves-amount">0 VES</div>
+      </div>
+      <button class="btn-primary" onclick="location.reload()">JUGAR OTRA VEZ</button>
+      <button class="btn-secondary" style="margin-top: 10px;" onclick="volverAlDashboard()">VOLVER AL DASHBOARD</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const MAP_SIZE = 2400;
+  const BOT_NAMES = ['Carlos_24', 'ElFlaco_VE', 'SofiG', 'KingApure', 'Luisito09', 'MariaJose', 'Jhonny_R', 'Valeria22', 'AndresPRO', 'Kike_10', 'Nathy_M', 'Santi_G'];
+  const COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
+  let gameState = 'PREP'; // 'PREP' (10s) -> 'COMBAT' (60s) -> 'ENDED'
+  let timeLeft = 10;
+  let worms = [];
+  let foods = [];
+  let pointer = { x: canvas.width / 2, y: canvas.height / 2, boosting: false };
+
+  // Controles Mouse y Táctil
+  window.addEventListener('mousemove', (e) => { pointer.x = e.clientX; pointer.y = e.clientY; });
+  window.addEventListener('mousedown', () => pointer.boosting = true);
+  window.addEventListener('mouseup', () => pointer.boosting = false);
+  
+  window.addEventListener('touchmove', (e) => {
+    pointer.x = e.touches[0].clientX;
+    pointer.y = e.touches[0].clientY;
+  });
+  window.addEventListener('touchstart', () => pointer.boosting = true);
+  window.addEventListener('touchend', () => pointer.boosting = false);
+
+  const boostBtn = document.getElementById('boost-btn');
+  if (boostBtn) {
+    boostBtn.addEventListener('touchstart', (e) => { e.preventDefault(); pointer.boosting = true; });
+    boostBtn.addEventListener('touchend', (e) => { e.preventDefault(); pointer.boosting = false; });
+  }
+
+  class Worm {
+    constructor(id, name, isPlayer, x, y, color) {
+      this.id = id;
+      this.name = name;
+      this.isPlayer = isPlayer;
+      this.color = color;
+      this.angle = Math.random() * Math.PI * 2;
+      this.baseSpeed = 3.2;
+      this.radius = 12;
+      this.segments = [];
+      this.targetLength = 25;
+      this.simMoney = 0;
+      this.kills = 0;
+      this.alive = true;
+      this.aiTimer = 0;
+      this.targetAngle = this.angle;
+
+      for (let i = 0; i < this.targetLength; i++) {
+        this.segments.push({ x: x - Math.cos(this.angle) * i * 4, y: y - Math.sin(this.angle) * i * 4 });
+      }
+    }
+
+    get head() { return this.segments[0]; }
+
+    update() {
+      if (!this.alive) return;
+      let speed = this.baseSpeed;
+
+      if (this.isPlayer) {
+        const dx = pointer.x - canvas.width / 2;
+        const dy = pointer.y - canvas.height / 2;
+        this.targetAngle = Math.atan2(dy, dx);
+        if (pointer.boosting && this.targetLength > 15) {
+          speed = this.baseSpeed * 1.65;
+          this.targetLength -= 0.05;
+        }
+      } else {
+        this.runBotAI();
+      }
+
+      let diff = this.targetAngle - this.angle;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      this.angle += diff * 0.12;
+
+      let newX = this.head.x + Math.cos(this.angle) * speed;
+      let newY = this.head.y + Math.sin(this.angle) * speed;
+
+      if (newX < 50) { newX = 50; this.targetAngle = 0; }
+      if (newX > MAP_SIZE - 50) { newX = MAP_SIZE - 50; this.targetAngle = Math.PI; }
+      if (newY < 50) { newY = 50; this.targetAngle = Math.PI / 2; }
+      if (newY > MAP_SIZE - 50) { newY = MAP_SIZE - 50; this.targetAngle = -Math.PI / 2; }
+
+      this.segments.unshift({ x: newX, y: newY });
+      while (this.segments.length > Math.floor(this.targetLength)) {
+        this.segments.pop();
+      }
+    }
+
+    runBotAI() {
+      this.aiTimer--;
+      let dangerDetected = false;
+      const lookAheadX = this.head.x + Math.cos(this.angle) * 85;
+      const lookAheadY = this.head.y + Math.sin(this.angle) * 85;
+
+      // 1. Detección de peligro (esquivar cuerpos de otros gusanos)
+      for (let other of worms) {
+        if (other.id === this.id || !other.alive) continue;
+        for (let i = 0; i < other.segments.length; i += 3) {
+          const seg = other.segments[i];
+          if (Math.hypot(lookAheadX - seg.x, lookAheadY - seg.y) < 65) {
+            this.targetAngle += (Math.random() > 0.5 ? 1.6 : -1.6);
+            dangerDetected = true;
+            this.aiTimer = 15; // Forzar un nuevo rumbo tras esquivar
+            break;
+          }
+        }
+        if (dangerDetected) break;
+      }
+
+      // 2. Si no hay peligro, buscar comida por todo el mapa de forma dinámica
+      if (!dangerDetected && this.aiTimer <= 0) {
+        this.aiTimer = 20 + Math.floor(Math.random() * 20); // Cambiar de objetivo cada cierto tiempo
+        
+        let nearestFood = null;
+        let minDist = 400; // Radio de visión del bot
+
+        for (let f of foods) {
+          const d = Math.hypot(f.x - this.head.x, f.y - this.head.y);
+          if (d < minDist) {
+            minDist = d;
+            nearestFood = f;
+          }
+        }
+
+        if (nearestFood) {
+          // Si encuentra comida cerca, va por ella, pero añade un leve margen para evitar el bucle circular exacto
+          this.targetAngle = Math.atan2(nearestFood.y - this.head.y, nearestFood.x - this.head.x) + (Math.random() - 0.5) * 0.2;
+        } else {
+          // Si no hay comida cerca, el bot explora libremente navegando por el mapa
+          this.targetAngle += (Math.random() - 0.5) * 1.8;
+        }
+      }
+
+      // Evitar que las esquinas o bordes encierren al bot
+      if (this.head.x < 150 || this.head.x > MAP_SIZE - 150 || this.head.y < 150 || this.head.y > MAP_SIZE - 150) {
+        const centerX = MAP_SIZE / 2;
+        const centerY = MAP_SIZE / 2;
+        this.targetAngle = Math.atan2(centerY - this.head.y, centerX - this.head.x);
+        this.aiTimer = 30;
+      }
+    }
+    
+    draw(camX, camY) {
+      if (!this.alive) return;
+      for (let i = this.segments.length - 1; i >= 0; i--) {
+        const seg = this.segments[i];
+        const screenX = seg.x - camX;
+        const screenY = seg.y - camY;
+
+        if (screenX < -40 || screenX > canvas.width + 40 || screenY < -40 || screenY > canvas.height + 40) continue;
+
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, i === 0 ? this.radius + 2 : this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = i === 0 ? '#ffffff' : this.color;
+        ctx.globalAlpha = gameState === 'PREP' ? 0.55 : 1.0;
+        ctx.fill();
+        ctx.closePath();
+      }
+      ctx.globalAlpha = 1.0;
+
+      const headScreenX = this.head.x - camX;
+      const headScreenY = this.head.y - camY;
+      ctx.fillStyle = this.isPlayer ? '#fbbf24' : '#e6edf3';
+      ctx.font = 'bold 12px Segoe UI';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${this.name} (${this.simMoney.toFixed(0)} VES)`, headScreenX, headScreenY - 22);
+    }
+  }
+
+  function spawnFood(x, y, value = 1, isLoot = false) {
+    foods.push({
+      x: x ?? Math.random() * (MAP_SIZE - 100) + 50,
+      y: y ?? Math.random() * (MAP_SIZE - 100) + 50,
+      radius: isLoot ? 7 : 4,
+      value: value,
+      color: isLoot ? '#4ade80' : COLORS[Math.floor(Math.random() * COLORS.length)]
+    });
+  }
+
+  function initGame() {
+    const player = new Worm('player', 'Tú (Práctica)', true, MAP_SIZE / 2, MAP_SIZE / 2, '#fbbf24');
+    worms.push(player);
+
+    for (let i = 0; i < 11; i++) {
+      spawnBot(i);
+    }
+
+    for (let i = 0; i < 280; i++) {
+      spawnFood();
+    }
+  }
+
+  function spawnBot(index) {
+    const x = Math.random() * (MAP_SIZE - 200) + 100;
+    const y = Math.random() * (MAP_SIZE - 200) + 100;
+    const name = BOT_NAMES[index % BOT_NAMES.length];
+    const color = COLORS[index % COLORS.length];
+    worms.push(new Worm('bot-' + index + '-' + Date.now(), name, false, x, y, color));
+  }
+
+  // Reloj de Fases (10s Prep -> 60s Combate)
+  const timerInterval = setInterval(() => {
+    if (gameState === 'ENDED') return;
+    timeLeft--;
+    
+    let minutes = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+    let seconds = (timeLeft % 60).toString().padStart(2, '0');
+    document.getElementById('timer-display').innerText = `${minutes}:${seconds}`;
+
+    if (timeLeft <= 0) {
+      if (gameState === 'PREP') {
+        gameState = 'COMBAT';
+        timeLeft = 60;
+        document.getElementById('timer-label').innerText = 'Combate';
+        document.getElementById('phase-banner').innerText = '🔥 ¡COMBATE ACTIVO! Los bots y tú ya pueden chocar y matarse';
+        document.getElementById('phase-banner').style.background = 'rgba(239, 68, 68, 0.15)';
+        document.getElementById('phase-banner').style.borderColor = '#ef4444';
+        document.getElementById('phase-banner').style.color = '#ef4444';
+      } else if (gameState === 'COMBAT') {
+        endGame('¡TIEMPO TERMINADO!', 'Has sobrevivido al tiempo de práctica.');
+      }
+    }
+  }, 1000);
+
+  function checkCollisions() {
+    for (let w of worms) {
+      if (!w.alive) continue;
+      for (let i = foods.length - 1; i >= 0; i--) {
+        const f = foods[i];
+        if (Math.hypot(w.head.x - f.x, w.head.y - f.y) < w.radius + f.radius + 4) {
+          w.targetLength += f.value * 0.8;
+          w.simMoney += f.value * 5; // Suma VES simulados
+          foods.splice(i, 1);
+          if (foods.length < 250) spawnFood();
+        }
+      }
+    }
+
+    if (gameState !== 'COMBAT') return;
+
+    for (let attacker of worms) {
+      if (!attacker.alive) continue;
+      for (let victim of worms) {
+        if (attacker.id === victim.id || !victim.alive) continue;
+        for (let i = 2; i < victim.segments.length; i++) {
+          const seg = victim.segments[i];
+          if (Math.hypot(attacker.head.x - seg.x, attacker.head.y - seg.y) < attacker.radius + victim.radius - 4) {
+            killWorm(attacker, victim);
+            break;
+          }
+        }
+        if (!attacker.alive) break;
+      }
+    }
+  }
+
+  function killWorm(deadWorm, killerWorm) {
+    deadWorm.alive = false;
+    killerWorm.kills++;
+    killerWorm.simMoney += 50 + (deadWorm.simMoney * 0.5);
+
+    for (let i = 0; i < deadWorm.segments.length; i += 2) {
+      const seg = deadWorm.segments[i];
+      spawnFood(seg.x, seg.y, 4, true);
+    }
+
+    if (deadWorm.isPlayer) {
+      endGame('¡TE ELIMINARON!', 'Un bot te ha cruzado en la sala de práctica.');
+    } else {
+      setTimeout(() => {
+        if (gameState !== 'ENDED') spawnBot(Math.floor(Math.random() * BOT_NAMES.length));
+      }, 3000);
+    }
+  }
+
+  function updateHUD() {
+    const player = worms.find(w => w.isPlayer);
+    if (player) {
+      document.getElementById('ves-display').innerText = `${player.simMoney.toFixed(0)} VES`;
+    }
+    const aliveCount = worms.filter(w => w.alive).length;
+    document.getElementById('alive-display').innerText = `${aliveCount} / ${worms.length}`;
+  }
+
+  function endGame(title, desc) {
+    gameState = 'ENDED';
+    clearInterval(timerInterval);
+    const player = worms.find(w => w.isPlayer);
+    document.getElementById('end-title').innerText = title;
+    document.getElementById('end-desc').innerText = desc;
+    document.getElementById('end-ves-amount').innerText = `${player ? player.simMoney.toFixed(0) : '0'} VES`;
+    document.getElementById('end-modal').style.display = 'flex';
+  }
+
+  function volverAlDashboard() {
+    window.location.href = 'dashboard.html';
+  }
+
+  function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const player = worms.find(w => w.isPlayer) || worms[0];
+    const camX = player ? player.head.x - canvas.width / 2 : 0;
+    const camY = player ? player.head.y - canvas.height / 2 : 0;
+
+    // Cuadrícula del fondo
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.lineWidth = 1;
+    const gridSize = 60;
+    const offsetX = -camX % gridSize;
+    const offsetY = -camY % gridSize;
+    for (let x = offsetX; x < canvas.width; x += gridSize) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (let y = offsetY; y < canvas.height; y += gridSize) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+
+    // Bordes de la arena
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(-camX, -camY, MAP_SIZE, MAP_SIZE);
+
+    // Comida
+    for (let f of foods) {
+      const sx = f.x - camX;
+      const sy = f.y - camY;
+      if (sx < -20 || sx > canvas.width + 20 || sy < -20 || sy > canvas.height + 20) continue;
+      ctx.beginPath();
+      ctx.arc(sx, sy, f.radius, 0, Math.PI * 2);
+      ctx.fillStyle = f.color;
+      ctx.fill();
+    }
+
+    // Gusanos (Jugador y Bots)
+    for (let w of worms) {
+      w.update();
+      w.draw(camX, camY);
+    }
+
+    checkCollisions();
+    updateHUD();
+
+    if (gameState !== 'ENDED') {
+      requestAnimationFrame(gameLoop);
+    }
+  }
+
+  initGame();
+  gameLoop();
+</script>
+</body>
+</html>
