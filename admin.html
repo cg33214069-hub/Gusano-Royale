@@ -366,6 +366,11 @@
       </div>
     </div>
 
+    <div class="stat-card" style="background: #1e293b; padding: 20px; border-radius: 12px; color: #fff; text-align: center; margin-bottom: 20px;">
+  <h3 style="color: #38bdf8; font-size: 1.1rem; margin-bottom: 8px;">💰 Dinero Total en la Plataforma</h3>
+  <p id="total-platform-money" style="font-size: 28px; font-weight: bold; color: #38bdf8;">Calculando...</p>
+</div>
+
     <!-- BUSCADOR RÁPIDO DE USUARIOS Y SALDO -->
     <div class="search-box-card">
       <h2 style="font-size: 1rem; color: #38bdf8; text-transform: uppercase;">🔍 Búsqueda y Gestión Rápida de Saldo de Usuario</h2>
@@ -566,6 +571,7 @@
 
     function actualizarBotonComidaUI(activo) {
         const btn = document.getElementById('btn-toggle-food');
+        if (!btn) return;
         if (activo) {
             btn.innerText = '🟢 Comida ACTIVA (Clic para Apagar)';
             btn.style.background = '#22c55e';
@@ -596,7 +602,8 @@
         loadPromotoresData();
       }
     }
-// --- FUNCIÓN GLOBAL PARA BUSCAR PERFILES ---
+
+    // --- FUNCIÓN GLOBAL PARA BUSCAR PERFILES ---
     function getProfileData(rawUserId) {
       if (!rawUserId) return { name: 'Desconocido', phone: '' };
       const searchVal = String(rawUserId).trim().toLowerCase();
@@ -610,32 +617,30 @@
       }
       return { name: rawUserId, phone: '' };
     } 
+
     async function loadData() {
       const { data: profiles } = await supabaseClient.from('profiles').select('*');
 
       globalUserMap = {};
+      let dineroPlataformaTotal = 0;
+
       if (profiles && profiles.length > 0) {
         profiles.forEach(p => {
           const displayName = p.username || p.name || (p.email ? p.email.split('@')[0] : 'Usuario');
-          if (p.id) globalUserMap[String(p.id).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: p.balance || 0 };
-          if (p.email) globalUserMap[String(p.email).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: p.balance || 0 };
-          if (p.username) globalUserMap[String(p.username).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: p.balance || 0 };
-          if (p.name) globalUserMap[String(p.name).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: p.balance || 0 };
+          const userBalance = Number(p.balance || 0);
+          dineroPlataformaTotal += userBalance;
+
+          if (p.id) globalUserMap[String(p.id).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: userBalance };
+          if (p.email) globalUserMap[String(p.email).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: userBalance };
+          if (p.username) globalUserMap[String(p.username).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: userBalance };
+          if (p.name) globalUserMap[String(p.name).trim().toLowerCase()] = { id: p.id, name: displayName, phone: p.phone || p.telefono || '', balance: userBalance };
         });
       }
 
-      function getProfileData(rawUserId) {
-        if (!rawUserId) return { name: 'Desconocido', phone: '' };
-        const searchVal = String(rawUserId).trim().toLowerCase();
-        if (globalUserMap[searchVal]) return globalUserMap[searchVal];
-        for (let key in globalUserMap) {
-          if (key.includes(searchVal) || searchVal.includes(key)) return globalUserMap[key];
-        }
-        if (searchVal.includes('@')) {
-          const emailPrefix = searchVal.split('@')[0];
-          return { name: emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1), phone: '' };
-        }
-        return { name: rawUserId, phone: '' };
+      // Actualizamos el contador total de la plataforma en vivo
+      const totalPlatformElem = document.getElementById('total-platform-money');
+      if (totalPlatformElem) {
+        totalPlatformElem.innerText = `${dineroPlataformaTotal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES`;
       }
 
       // --- CARGAR DEPÓSITOS PENDIENTES ---
@@ -648,7 +653,7 @@
         .order('created_at', { ascending: false });
 
       let totalWithdrawn = 0;
-      let totalDeposited = 0; // Calculado desde depósitos aprobados
+      let totalDeposited = 0; 
       
       const { data: depAprobados } = await supabaseClient
         .from('deposits')
@@ -738,6 +743,7 @@
         `;
       }).join('');
     }
+
     // --- FUNCIÓN PARA APROBAR DEPÓSITO, ACREDITAR SALDO Y ABRIR WHATSAPP CON FACTURA ---
     async function aprobarDeposito(depositId, userId, monto, referencia, emailUsuario) {
       if (!confirm(`¿Estás seguro de aprobar el depósito de ${Number(monto).toLocaleString('es-VE')} VES? Esto le sumará el saldo al usuario.`)) return;
@@ -892,13 +898,11 @@
         return;
       }
 
-      // Buscamos primero por username
       let { data, error } = await supabaseClient
         .from('profiles')
         .select('*')
         .ilike('username', `%${query}%`);
 
-      // Si no encuentra nada por username, intentamos por email
       if (!data || data.length === 0) {
         const resEmail = await supabaseClient
           .from('profiles')
@@ -913,7 +917,6 @@
         return;
       }
 
-      // Tomamos el primer resultado encontrado
       currentFoundUser = data[0];
       const nombreMostrar = currentFoundUser.username || currentFoundUser.email || 'Usuario';
 
@@ -921,6 +924,7 @@
       document.getElementById('res-balance').innerText = Number(currentFoundUser.balance || 0).toLocaleString('es-VE');
       document.getElementById('user-result-container').style.display = 'block';
     }
+
     async function modifyUserBalance(action) {
       if (!currentFoundUser) return;
       const amountInput = Number(document.getElementById('action-amount').value);
@@ -952,7 +956,7 @@
     async function loadPromotoresData() {
       const { data } = await supabaseClient.from('promotores').select('*');
       const tbody = document.getElementById('promoter-reports-table-body');
-      if (data && data.length > 0) {
+      if (tbody && data && data.length > 0) {
         tbody.innerHTML = data.map(p => `
           <tr>
             <td>${p.nombre}</td>
@@ -982,18 +986,20 @@
       document.getElementById('form-crear-promotor').reset();
       loadPromotoresData();
     }
-   async function actualizarMapaGlobal(nuevoTamano) {
-    const { error } = await supabaseClient
-      .from('game_config')
-      .update({ map_size: nuevoTamano })
-      .eq('id', 1);
 
-    if (error) {
-      alert("❌ Error al actualizar el mapa: " + error.message);
-    } else {
-      alert(`✅ ¡Listo! Todas las salas ahora tienen un mapa de ${nuevoTamano}x${nuevoTamano}px.`);
-    }
-  }  
+    async function actualizarMapaGlobal(nuevoTamano) {
+      const { error } = await supabaseClient
+        .from('game_config')
+        .update({ map_size: nuevoTamano })
+        .eq('id', 1);
+
+      if (error) {
+        alert("❌ Error al actualizar el mapa: " + error.message);
+      } else {
+        alert(`✅ ¡Listo! Todas las salas ahora tienen un mapa de ${nuevoTamano}x${nuevoTamano}px.`);
+      }
+    } 
+
     // Inicializar datos al cargar la página
     loadData();
   </script>

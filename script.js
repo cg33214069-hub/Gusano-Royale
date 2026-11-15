@@ -113,15 +113,25 @@ async function descontarEntradaEnSupabase() {
 const mouse = { x: canvas.width / 2, y: canvas.height / 2 };
 let isBoosting = false;
 
+// --- CONTROL HÍBRIDO (MOUSE / TACTIL / JOYSTICK) ---
 window.addEventListener('mousemove', (e) => {
-  mouse.x = e.clientX;
-  mouse.y = e.clientY;
+  // Solo usa el mouse si no hay joystick activo en móviles
+  if (typeof joystickVector === 'undefined' || (joystickVector.x === 0 && joystickVector.y === 0)) {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  }
 });
 
 window.addEventListener('touchmove', (e) => {
   if (e.touches.length > 0) {
-    mouse.x = e.touches[0].clientX;
-    mouse.y = e.touches[0].clientY;
+    // Si toca la mitad derecha de la pantalla y no hay joystick flotante activo
+    for (let i = 0; i < e.touches.length; i++) {
+      let t = e.touches[i];
+      if (t.clientX >= window.innerWidth / 2) {
+        mouse.x = t.clientX;
+        mouse.y = t.clientY;
+      }
+    }
   }
 }, { passive: true });
 
@@ -313,9 +323,16 @@ function updateLocalPlayer() {
     player.ves -= (selectedEntryFee * 0.0005);
   }
 
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
-  const targetAngle = Math.atan2(mouse.y - centerY, mouse.x - centerX);
+  // --- CÁLCULO DE ÁNGULO: JOYSTICK FLOTANTE O MOUSE ---
+  let targetAngle = player.angle;
+  if (typeof joystickVector !== 'undefined' && (joystickVector.x !== 0 || joystickVector.y !== 0)) {
+    targetAngle = Math.atan2(joystickVector.y, joystickVector.x);
+  } else {
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    targetAngle = Math.atan2(mouse.y - centerY, mouse.x - centerX);
+  }
+
   let diff = targetAngle - player.angle;
   while (diff < -Math.PI) diff += Math.PI * 2;
   while (diff > Math.PI) diff -= Math.PI * 2;
@@ -552,7 +569,7 @@ function startTimer() {
     if (timeLeft <= 0) {
       if (currentPhase === 'PREPARATION') {
         currentPhase = 'COMBAT';
-        timeLeft = COMBAT_TIME; 
+        timeLeft = COMBAT_TIME;      
       } else {
         endGame(true, "¡Sobreviviste a la ronda! Te llevas todo tu botín recolectado.");
       }

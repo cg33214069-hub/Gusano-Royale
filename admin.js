@@ -1,4 +1,13 @@
 // ==========================================
+// INICIALIZACIÓN DE SUPABASE
+// ==========================================
+const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
+
+// Creamos el cliente globalmente para que todas las funciones lo reconozcan
+const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+// ==========================================
 // DATOS SIMULADOS / SUPABASE INTEGRATION
 // ==========================================
 let depositsData = [
@@ -306,3 +315,48 @@ function updateWithdrawalStatus(index, newStatus) {
 // ==========================================
 renderDeposits();
 renderWithdrawals();
+
+// ==========================================
+// CONTADOR EN VIVO DEL DINERO DE LA PLATAFORMA
+// ==========================================
+async function actualizarTotalPlataforma() {
+  console.log("Consultando Supabase para sumar saldos...");
+  
+  try {
+    if (!supabaseClient) {
+      console.error("¡Error crítico! supabaseClient no está inicializado.");
+      const counterElement = document.getElementById('total-platform-money');
+      if (counterElement) counterElement.innerText = "Error de conexión";
+      return;
+    }
+
+    const { data, error } = await supabaseClient
+      .from('profiles')
+      .select('balance');
+
+    if (error) {
+      console.error("Error de Supabase al obtener balances:", error);
+      return;
+    }
+
+    let dineroTotal = 0;
+    if (data && data.length > 0) {
+      dineroTotal = data.reduce((acc, user) => acc + Number(user.balance || 0), 0);
+    }
+
+    console.log("Dinero total calculado:", dineroTotal);
+
+    const counterElement = document.getElementById('total-platform-money');
+    if (counterElement) {
+      counterElement.innerText = `${dineroTotal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES`;
+    }
+  } catch (err) {
+    console.error("Excepción atrapada en el contador total:", err);
+  }
+}
+
+// Arrancar el contador de inmediato y repetirlo cada 10 segundos
+setTimeout(() => {
+  actualizarTotalPlataforma();
+  setInterval(actualizarTotalPlataforma, 10000);
+}, 500);

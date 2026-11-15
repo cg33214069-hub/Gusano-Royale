@@ -45,6 +45,20 @@
       #boost-btn { display: none; } /* En PC se usa la barra espaciadora */
     }
 
+    /* --- ESTILOS DEL JOYSTICK FLOTANTE --- */
+    #joystick-base {
+      position: absolute; width: 120px; height: 120px; border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.3);
+      display: none; transform: translate(-50%, -50%); pointer-events: none; z-index: 999;
+    }
+    #joystick-stick {
+      position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; border-radius: 50%;
+      background: rgba(56, 189, 248, 0.6); box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+    }
+    @media (min-width: 768px) {
+      #joystick-base { display: none !important; } /* En PC se usa el mouse o teclado */
+    }
+
     /* Ocultamos el minimap por diseño */
     #minimap { display: none; }
 
@@ -59,14 +73,12 @@
     .modal h2 { font-size: 1.8rem; margin-bottom: 10px; color: #38bdf8; }
     .btn-primary { background: #22c55e; color: #fff; border: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; }
 
-
     /* --- ADAPTACIÓN ESPECIAL PARA CELULARES (PANTALLAS MENORES A 768px) --- */
     @media (max-width: 767px) {
       body, html {
         overflow: hidden;
         position: fixed;
       }
-      /* Movemos el HUD más hacia la derecha y arriba para separarlo del botón Salir */
       .hud-bar {
         position: absolute;
         top: 10px;
@@ -91,7 +103,6 @@
         font-size: 0.75rem;
         z-index: 20;
       }
-      /* Subimos el botón de Turbo para que se vea completo y no lo corte la pantalla */
       #boost-btn {
         width: 75px;
         height: 75px;
@@ -116,6 +127,11 @@
 
   <canvas id="gameCanvas"></canvas>
   <canvas id="minimap"></canvas>
+
+  <!-- Joystick Flotante para Celular (Lado Izquierdo) -->
+  <div id="joystick-base">
+    <div id="joystick-stick"></div>
+  </div>
 
   <!-- Botón táctil de Turbo para Celular -->
   <button id="boost-btn">TURBO</button>
@@ -142,6 +158,86 @@
 
   window.isPreparingTimerActive = true;
   setTimeout(() => { window.isPreparingTimerActive = false; }, 10000);
+
+  // --- VARIABLES GLOBALES DEL JOYSTICK FLOTANTE ---
+  let joystickActive = false;
+  let joystickTouchId = null;
+  let joystickCenter = { x: 0, y: 0 };
+  let joystickVector = { x: 0, y: 0 }; // Exportado globalmente para script.js
+
+  const joystickBase = document.getElementById('joystick-base');
+  const joystickStick = document.getElementById('joystick-stick');
+
+  // Control táctil para la mitad izquierda de la pantalla
+  window.addEventListener('touchstart', (e) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      let touch = e.changedTouches[i];
+      
+      // Si toca la mitad izquierda y el joystick no está activo
+      if (touch.clientX < window.innerWidth / 2 && !joystickActive) {
+        joystickActive = true;
+        joystickTouchId = touch.identifier;
+        
+        joystickCenter.x = touch.clientX;
+        joystickCenter.y = touch.clientY;
+        
+        if (joystickBase) {
+          joystickBase.style.left = `${touch.clientX}px`;
+          joystickBase.style.top = `${touch.clientY}px`;
+          joystickBase.style.display = 'block';
+        }
+        
+        if (joystickStick) {
+          joystickStick.style.transform = `translate(0px, 0px)`;
+        }
+        joystickVector = { x: 0, y: 0 };
+      }
+    }
+  }, { passive: false });
+
+  window.addEventListener('touchmove', (e) => {
+    if (!joystickActive) return;
+    
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      let touch = e.changedTouches[i];
+      
+      if (touch.identifier === joystickTouchId) {
+        let deltaX = touch.clientX - joystickCenter.x;
+        let deltaY = touch.clientY - joystickCenter.y;
+        
+        let distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        let maxRadius = 45; // Radio máximo de movimiento del joystick
+        
+        if (distance > maxRadius) {
+          deltaX = (deltaX / distance) * maxRadius;
+          deltaY = (deltaY / distance) * maxRadius;
+        }
+        
+        if (joystickStick) {
+          joystickStick.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        }
+        
+        let normDist = Math.min(distance, maxRadius) / maxRadius;
+        joystickVector.x = (distance > 0 ? (deltaX / distance) : 0) * normDist;
+        joystickVector.y = (distance > 0 ? (deltaY / distance) : 0) * normDist;
+      }
+    }
+  }, { passive: false });
+
+  window.addEventListener('touchend', (e) => {
+    if (!joystickActive) return;
+    
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      let touch = e.changedTouches[i];
+      
+      if (touch.identifier === joystickTouchId) {
+        joystickActive = false;
+        joystickTouchId = null;
+        if (joystickBase) joystickBase.style.display = 'none';
+        joystickVector = { x: 0, y: 0 };
+      }
+    }
+  });
 
   // --- REGISTRO DE PRESENCIA EN VIVO EN LA SALA SELECCIONADA ---
   window.addEventListener('DOMContentLoaded', async () => {
