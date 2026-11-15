@@ -67,10 +67,8 @@ function resizeCanvas() {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-
 let selectedEntryFee = parseInt(localStorage.getItem('selected_entry')) || 100;
 let selectedSkin = localStorage.getItem('selected_skin') || 've';
-// Capturamos el color guardado en el selector de la interfaz (o asignamos uno por defecto)
 let selectedColor = localStorage.getItem('worm_color') || '#22c55e';
 let playerName = localStorage.getItem('player_name') || 'Jugador';
 let gameActive = true;
@@ -219,7 +217,7 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
         p.targetAngle = payload.angle;
         p.ves = payload.ves;
         p.skinId = payload.skinId;
-        p.color = payload.color; // Sincronizamos el color remoto
+        p.color = payload.color;
         p.targetBody = payload.body;
       }
       remotePlayers[payload.id].lastUpdate = Date.now();
@@ -265,7 +263,7 @@ let player = {
   length: 20,
   ves: selectedEntryFee, 
   skinId: selectedSkin,
-  color: selectedColor, // ¡Inyectamos aquí el color seleccionado por el usuario!
+  color: selectedColor,
   alive: true
 };
 
@@ -326,8 +324,9 @@ function updateLocalPlayer() {
   player.x += Math.cos(player.angle) * currentSpeed;
   player.y += Math.sin(player.angle) * currentSpeed;
 
-  player.x = Math.max(30, Math.min(WORLD_SIZE - 30, player.x));
-  player.y = Math.max(30, Math.min(WORLD_SIZE - 30, player.y));
+  const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
+  player.x = Math.max(30, Math.min(mapSizeSafe - 30, player.x));
+  player.y = Math.max(30, Math.min(mapSizeSafe - 30, player.y));
 
   player.body.unshift({ x: player.x, y: player.y });
   while (player.body.length > player.length) {
@@ -344,8 +343,8 @@ function updateLocalPlayer() {
         if (Math.hypot(dx, dy) < player.radius + food.radius + 4) {
           player.ves += food.ves; 
 
-          food.x = Math.random() * (WORLD_SIZE - 200) + 100;
-          food.y = Math.random() * (WORLD_SIZE - 200) + 100;
+          food.x = Math.random() * (mapSizeSafe - 200) + 100;
+          food.y = Math.random() * (mapSizeSafe - 200) + 100;
           food.ves = valorComidaConfig;
         }
       }
@@ -387,7 +386,7 @@ function updateLocalPlayer() {
           angle: player.angle,
           ves: player.ves,
           skinId: player.skinId,
-          color: player.color, // Enviamos el color actual en la red
+          color: player.color,
           body: player.body.slice(0, 15)
         }
       });
@@ -396,7 +395,7 @@ function updateLocalPlayer() {
 }
 
 // ==========================================
-// 4. RENDERIZADO
+// 4. RENDERIZADO Y LÍNEA DELIMITADORA
 // ==========================================
 function drawPlayer(p, camera, isLocal = false) {
   if (!isLocal) {
@@ -443,7 +442,6 @@ function drawPlayer(p, camera, isLocal = false) {
       else if (i % 3 === 1) ctx.fillStyle = '#00247d';
       else ctx.fillStyle = '#cf142b';
     } else {
-      // Priorizamos el color del objeto (p.color), luego localStorage, y por último respaldos
       ctx.fillStyle = p.color || localStorage.getItem('worm_color') || (isLocal ? '#22c55e' : '#38bdf8');
     }
     ctx.fill();
@@ -457,6 +455,48 @@ function drawPlayer(p, camera, isLocal = false) {
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(`${p.name} (${Math.floor(p.ves)} VES)`, headX, headY - 18);
+  }
+}
+
+// ==========================================
+// FUNCIÓN: TABLA DE POSICIONES (LEADERBOARD)
+// ==========================================
+function drawLeaderboard() {
+  let allPlayers = [{ name: player.name, ves: player.ves, isLocal: true }];
+  Object.values(remotePlayers).forEach(rp => {
+    allPlayers.push({ name: rp.name || 'Jugador', ves: rp.ves || 0, isLocal: false });
+  });
+
+  allPlayers.sort((a, b) => b.ves - a.ves);
+
+  const startX = canvas.width - 210;
+  const startY = 80;
+  const width = 190;
+  const height = 30 + (Math.min(5, allPlayers.length) * 24);
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.fillRect(startX, startY, width, height);
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(startX, startY, width, height);
+
+  ctx.fillStyle = '#38bdf8';
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('🏆 TOP RECOLECTORES', startX + 12, startY + 20);
+
+  ctx.font = '11px sans-serif';
+  for (let i = 0; i < Math.min(5, allPlayers.length); i++) {
+    const p = allPlayers[i];
+    const yPos = startY + 42 + (i * 22);
+
+    ctx.fillStyle = p.isLocal ? '#4ade80' : '#ffffff';
+    ctx.fillText(`${i + 1}. ${p.name.substring(0, 10)}`, startX + 12, yPos);
+    
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#eab308';
+    ctx.fillText(`${Math.floor(p.ves)} VES`, startX + width - 12, yPos);
+    ctx.textAlign = 'left';
   }
 }
 
@@ -540,6 +580,7 @@ function gameLoop(timestamp) {
 
       const camera = { x: player.x - canvas.width / 2, y: player.y - canvas.height / 2 };
 
+      // Cuadrícula de fondo
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
       ctx.lineWidth = 1;
       for (let x = -camera.x % 120; x < canvas.width; x += 120) {
@@ -548,6 +589,17 @@ function gameLoop(timestamp) {
       for (let y = -camera.y % 120; y < canvas.height; y += 120) {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
       }
+
+      // ==========================================
+      // LÍNEA AZUL DELIMITADORA DINÁMICA Y SEGURA
+      // ==========================================
+      const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
+      const mapScreenX = 0 - camera.x;
+      const mapScreenY = 0 - camera.y;
+
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(mapScreenX, mapScreenY, mapSizeSafe, mapSizeSafe);
 
       if (mapaComidaActiva) {
         arenaFoodOrbs.forEach(food => {
@@ -576,18 +628,8 @@ function gameLoop(timestamp) {
       Object.values(remotePlayers).forEach(friend => drawPlayer(friend, camera, false));
       drawPlayer(player, camera, true);
 
-      if (currentPhase === 'PREPARATION') {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(canvas.width / 2 - 210, 30, 420, 50);
-        ctx.strokeStyle = '#eab308';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(canvas.width / 2 - 210, 30, 420, 50);
-
-        ctx.fillStyle = '#eab308';
-        ctx.font = 'bold 15px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(`⏳ PREPARACIÓN: El combate inicia en ${timeLeft}s`, canvas.width / 2, 62);
-      }
+      // Renderizar la tabla de posiciones
+      drawLeaderboard();
 
       updateHUD();
     }
