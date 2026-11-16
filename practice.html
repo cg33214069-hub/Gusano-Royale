@@ -24,16 +24,27 @@
     .hud-value.timer { color: #fbbf24; }
     .hud-value.alive { color: #f43f5e; }
 
+    /* Controles superiores organizados (Salir + Diseño) */
+    .top-left-controls {
+      position: absolute; top: 15px; left: 15px; display: flex; gap: 8px; z-index: 20;
+    }
+
+    #leave-btn {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;
+    }
+
+    #skin-btn {
+      background: rgba(56, 189, 248, 0.2);
+      border: 1px solid #38bdf8; color: #38bdf8; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;
+      display: none; /* Se activa en preparación */
+    }
+
     #phase-banner {
       position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
       background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #fbbf24;
       padding: 6px 20px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; z-index: 10;
       text-align: center; max-width: 90%;
-    }
-
-    #leave-btn {
-      position: absolute; top: 15px; left: 15px; background: rgba(239, 68, 68, 0.2);
-      border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; z-index: 10;
     }
 
     /* Botón de Turbo / Impulso táctil para Celular */
@@ -46,6 +57,20 @@
     }
     @media (min-width: 768px) {
       #boost-btn { display: none; }
+    }
+
+    /* --- ESTILOS DEL JOYSTICK FLOTANTE --- */
+    #joystick-base {
+      position: absolute; width: 120px; height: 120px; border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.3);
+      display: none; transform: translate(-50%, -50%); pointer-events: none; z-index: 999;
+    }
+    #joystick-stick {
+      position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; border-radius: 50%;
+      background: rgba(56, 189, 248, 0.6); box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+    }
+    @media (min-width: 768px) {
+      #joystick-base { display: none !important; }
     }
 
     #minimap { display: none; }
@@ -61,12 +86,23 @@
     .modal h2 { font-size: 1.8rem; margin-bottom: 10px; color: #f59e0b; }
     .btn-primary { background: #238636; color: #fff; border: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
     .btn-secondary { background: #30363d; color: #fff; border: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; }
+
+    @media (max-width: 767px) {
+      .top-left-controls { top: 10px; left: 10px; gap: 6px; }
+      #leave-btn, #skin-btn { padding: 6px 10px; font-size: 0.7rem; }
+      .hud-bar { top: 10px; right: 10px; left: auto; transform: none; padding: 5px 8px; gap: 8px; max-width: 55%; justify-content: space-around; }
+      .hud-value { font-size: 0.75rem; }
+      .hud-label { font-size: 0.45rem; }
+    }
   </style>
 </head>
 <body>
 
 <div id="game-container">
-  <button id="leave-btn" onclick="volverAlDashboard()">Salir al Dashboard</button>
+  <div class="top-left-controls">
+    <button id="leave-btn" onclick="volverAlDashboard()">Salir</button>
+    <button id="skin-btn" onclick="abrirModalDiseños()">Diseño</button>
+  </div>
 
   <div class="hud-bar">
     <div class="hud-item"><span class="hud-label" id="timer-label">Preparación</span><span class="hud-value timer" id="timer-display">00:10</span></div>
@@ -79,7 +115,26 @@
   <canvas id="gameCanvas"></canvas>
   <canvas id="minimap"></canvas>
 
+  <!-- Joystick Flotante para Celular (Lado Izquierdo) -->
+  <div id="joystick-base">
+    <div id="joystick-stick"></div>
+  </div>
+
   <button id="boost-btn">TURBO</button>
+
+  <!-- Modal del Catálogo Completo de Diseños (Solo en Preparación) -->
+  <div class="modal-overlay" id="catalogo-skins-modal" style="display: none;">
+    <div class="modal" style="max-width: 420px;">
+      <h2>🎨 Elige tu Diseño</h2>
+      <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 15px;">Cambia tu skin o color en la cuenta regresiva</p>
+      
+      <div id="grid-opciones-skins" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 220px; overflow-y: auto; margin-bottom: 20px; padding: 5px;">
+        <!-- Inyectado dinámicamente -->
+      </div>
+
+      <button class="btn-primary" onclick="cerrarModalDiseños()">Listo</button>
+    </div>
+  </div>
 
   <!-- Modal de Fin de Partida -->
   <div class="modal-overlay" id="end-modal" style="display: none;">
@@ -112,61 +167,180 @@
   const COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
   let gameState = 'PREP'; // 'PREP' (10s) -> 'COMBAT' (60s) -> 'ENDED'
-    let timeLeft = 10;
-    let worms = [];
-    let foods = [];
-    let pointer = { x: canvas.width / 2, y: canvas.height / 2, boosting: false };
+  let timeLeft = 10;
+  let worms = [];
+  let foods = [];
+  let pointer = { x: canvas.width / 2, y: canvas.height / 2, boosting: false };
 
-    // 1. EL RATÓN Y EL TÁCTIL SOLO CAMBIAN LA DIRECCIÓN (NO ACELERAN)
-    window.addEventListener('mousemove', (e) => { 
-      pointer.x = e.clientX; 
-      pointer.y = e.clientY; 
-    });
+  // --- VARIABLES GLOBALES DE PERSONALIZACIÓN ---
+  let selectedSkin = localStorage.getItem('selected_skin') || 've';
+  let selectedColor = localStorage.getItem('worm_color') || '#22c55e';
 
-    window.addEventListener('touchmove', (e) => {
-      pointer.x = e.touches[0].clientX;
-      pointer.y = e.touches[0].clientY;
-    });
+  // Catálogo completo de diseños y skins exclusivas
+  const catalogoDisponibles = [
+    { id: 've', name: 'Venezuela (Tricolor)', type: 'skin', color: '#ffcc00', preview: 'linear-gradient(45deg, #ffcc00, #00247d, #cf142b)' },
+    { id: 'fuego', name: 'Llama de Fuego 🔥', type: 'skin', color: '#f97316', preview: 'linear-gradient(45deg, #ef4444, #f97316, #eab308)' },
+    { id: 'galaxia', name: 'Galaxia Neón 🌌', type: 'skin', color: '#a855f7', preview: 'linear-gradient(45deg, #3b82f6, #a855f7, #ec4899)' },
+    { id: 'oro', name: 'Oro Puro 👑', type: 'skin', color: '#eab308', preview: 'linear-gradient(45deg, #facc15, #ca8a04, #713f12)' },
+    { id: 'custom', name: 'Verde Pro 🟢', type: 'color', color: '#22c55e', preview: '#22c55e' },
+    { id: 'custom', name: 'Rojo Furia 🔴', type: 'color', color: '#ef4444', preview: '#ef4444' },
+    { id: 'custom', name: 'Azul Eléctrico 🔵', type: 'color', color: '#38bdf8', preview: '#38bdf8' },
+    { id: 'custom', name: 'Morado Neón 🟣', type: 'color', color: '#a855f7', preview: '#a855f7' }
+  ];
 
-    // 2. CONTROL DE TECLADO EN PC (Barra Espaciadora para Turbo)
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') {
-        pointer.boosting = true;
-      }
-    });
+  function abrirModalDiseños() {
+    if (gameState !== 'PREP') {
+      alert("⚠️ Solo puedes cambiar tu diseño durante los segundos de preparación.");
+      return;
+    }
 
-    window.addEventListener('keyup', (e) => {
-      if (e.code === 'Space') {
-        pointer.boosting = false;
-      }
-    });
+    const grid = document.getElementById('grid-opciones-skins');
+    if (grid) {
+      grid.innerHTML = '';
+      catalogoDisponibles.forEach(item => {
+        const btn = document.createElement('div');
+        btn.style.cssText = `
+          background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+          padding: 10px; border-radius: 10px; cursor: pointer; text-align: center;
+          display: flex; flex-direction: column; align-items: center; gap: 6px;
+        `;
+        
+        const colorBox = document.createElement('div');
+        colorBox.style.cssText = `width: 30px; height: 30px; border-radius: 50%; background: ${item.preview}; border: 2px solid #fff;`;
+        
+        const label = document.createElement('span');
+        label.innerText = item.name;
+        label.style.cssText = 'font-size: 0.75rem; font-weight: bold; color: #fff;';
 
-    // 3. BOTÓN TÁCTIL DE TURBO EN CELULAR (Solo activa el turbo al presionarlo)
-    const boostBtn = document.getElementById('boost-btn');
-    if (boostBtn) {
-      boostBtn.addEventListener('touchstart', (e) => { 
-        e.preventDefault(); 
-        pointer.boosting = true; 
-      });
-      boostBtn.addEventListener('touchend', (e) => { 
-        e.preventDefault(); 
-        pointer.boosting = false; 
-      });
-      // Soporte por si acaso hacen clic en el botón con mouse en PC
-      boostBtn.addEventListener('mousedown', (e) => { 
-        pointer.boosting = true; 
-      });
-      boostBtn.addEventListener('mouseup', (e) => { 
-        pointer.boosting = false; 
+        btn.appendChild(colorBox);
+        btn.appendChild(label);
+
+        btn.onclick = () => {
+          selectedSkin = item.id;
+          selectedColor = item.color;
+          const player = worms.find(w => w.isPlayer);
+          if (player) {
+            player.skinId = item.id;
+            player.color = item.color;
+          }
+
+          localStorage.setItem('selected_skin', item.id);
+          localStorage.setItem('worm_color', item.color);
+          cerrarModalDiseños();
+        };
+
+        grid.appendChild(btn);
       });
     }
+
+    const modal = document.getElementById('catalogo-skins-modal');
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function cerrarModalDiseños() {
+    const modal = document.getElementById('catalogo-skins-modal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  // --- VARIABLES GLOBALES DEL JOYSTICK FLOTANTE ---
+  let joystickActive = false;
+  let joystickTouchId = null;
+  let joystickCenter = { x: 0, y: 0 };
+  let joystickVector = { x: 0, y: 0 };
+
+  const joystickBase = document.getElementById('joystick-base');
+  const joystickStick = document.getElementById('joystick-stick');
+
+  // Control táctil para la mitad izquierda (Joystick)
+  window.addEventListener('touchstart', (e) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      let touch = e.changedTouches[i];
+      if (touch.clientX < window.innerWidth / 2 && !joystickActive) {
+        joystickActive = true;
+        joystickTouchId = touch.identifier;
+        joystickCenter.x = touch.clientX;
+        joystickCenter.y = touch.clientY;
+        
+        if (joystickBase) {
+          joystickBase.style.left = `${touch.clientX}px`;
+          joystickBase.style.top = `${touch.clientY}px`;
+          joystickBase.style.display = 'block';
+        }
+        if (joystickStick) {
+          joystickStick.style.transform = `translate(0px, 0px)`;
+        }
+        joystickVector = { x: 0, y: 0 };
+      }
+    }
+  }, { passive: false });
+
+  window.addEventListener('touchmove', (e) => {
+    if (!joystickActive) return;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      let touch = e.changedTouches[i];
+      if (touch.identifier === joystickTouchId) {
+        let deltaX = touch.clientX - joystickCenter.x;
+        let deltaY = touch.clientY - joystickCenter.y;
+        let distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        let maxRadius = 45;
+        
+        if (distance > maxRadius) {
+          deltaX = (deltaX / distance) * maxRadius;
+          deltaY = (deltaY / distance) * maxRadius;
+        }
+        if (joystickStick) {
+          joystickStick.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        }
+        let normDist = Math.min(distance, maxRadius) / maxRadius;
+        joystickVector.x = (distance > 0 ? (deltaX / distance) : 0) * normDist;
+        joystickVector.y = (distance > 0 ? (deltaY / distance) : 0) * normDist;
+      }
+    }
+  }, { passive: false });
+
+  window.addEventListener('touchend', (e) => {
+    if (!joystickActive) return;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      let touch = e.changedTouches[i];
+      if (touch.identifier === joystickTouchId) {
+        joystickActive = false;
+        joystickTouchId = null;
+        if (joystickBase) joystickBase.style.display = 'none';
+        joystickVector = { x: 0, y: 0 };
+      }
+    }
+  });
+
+  // Control de Mouse (PC)
+  window.addEventListener('mousemove', (e) => { 
+    if (joystickVector.x === 0 && joystickVector.y === 0) {
+      pointer.x = e.clientX; 
+      pointer.y = e.clientY; 
+    }
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') pointer.boosting = true;
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') pointer.boosting = false;
+  });
+
+  const boostBtn = document.getElementById('boost-btn');
+  if (boostBtn) {
+    boostBtn.addEventListener('touchstart', (e) => { e.preventDefault(); pointer.boosting = true; }, { passive: false });
+    boostBtn.addEventListener('touchend', (e) => { e.preventDefault(); pointer.boosting = false; });
+    boostBtn.addEventListener('mousedown', () => pointer.boosting = true);
+    boostBtn.addEventListener('mouseup', () => pointer.boosting = false);
+  }
 
   class Worm {
     constructor(id, name, isPlayer, x, y, color) {
       this.id = id;
       this.name = name;
       this.isPlayer = isPlayer;
-      this.color = color;
+      this.color = isPlayer ? selectedColor : color;
+      this.skinId = isPlayer ? selectedSkin : 'custom';
       this.angle = Math.random() * Math.PI * 2;
       this.baseSpeed = 3.2;
       this.radius = 12;
@@ -190,9 +364,14 @@
       let speed = this.baseSpeed;
 
       if (this.isPlayer) {
-        const dx = pointer.x - canvas.width / 2;
-        const dy = pointer.y - canvas.height / 2;
-        this.targetAngle = Math.atan2(dy, dx);
+        if (joystickVector.x !== 0 || joystickVector.y !== 0) {
+          this.targetAngle = Math.atan2(joystickVector.y, joystickVector.x);
+        } else {
+          const dx = pointer.x - canvas.width / 2;
+          const dy = pointer.y - canvas.height / 2;
+          this.targetAngle = Math.atan2(dy, dx);
+        }
+
         if (pointer.boosting && this.targetLength > 15) {
           speed = this.baseSpeed * 1.65;
           this.targetLength -= 0.05;
@@ -226,7 +405,6 @@
       const lookAheadX = this.head.x + Math.cos(this.angle) * 85;
       const lookAheadY = this.head.y + Math.sin(this.angle) * 85;
 
-      // 1. Detección de peligro (esquivar cuerpos de otros gusanos)
       for (let other of worms) {
         if (other.id === this.id || !other.alive) continue;
         for (let i = 0; i < other.segments.length; i += 3) {
@@ -234,19 +412,17 @@
           if (Math.hypot(lookAheadX - seg.x, lookAheadY - seg.y) < 65) {
             this.targetAngle += (Math.random() > 0.5 ? 1.6 : -1.6);
             dangerDetected = true;
-            this.aiTimer = 15; // Forzar un nuevo rumbo tras esquivar
+            this.aiTimer = 15;
             break;
           }
         }
         if (dangerDetected) break;
       }
 
-      // 2. Si no hay peligro, buscar comida por todo el mapa de forma dinámica
       if (!dangerDetected && this.aiTimer <= 0) {
-        this.aiTimer = 20 + Math.floor(Math.random() * 20); // Cambiar de objetivo cada cierto tiempo
-        
+        this.aiTimer = 20 + Math.floor(Math.random() * 20);
         let nearestFood = null;
-        let minDist = 400; // Radio de visión del bot
+        let minDist = 400;
 
         for (let f of foods) {
           const d = Math.hypot(f.x - this.head.x, f.y - this.head.y);
@@ -257,15 +433,12 @@
         }
 
         if (nearestFood) {
-          // Si encuentra comida cerca, va por ella, pero añade un leve margen para evitar el bucle circular exacto
           this.targetAngle = Math.atan2(nearestFood.y - this.head.y, nearestFood.x - this.head.x) + (Math.random() - 0.5) * 0.2;
         } else {
-          // Si no hay comida cerca, el bot explora libremente navegando por el mapa
           this.targetAngle += (Math.random() - 0.5) * 1.8;
         }
       }
 
-      // Evitar que las esquinas o bordes encierren al bot
       if (this.head.x < 150 || this.head.x > MAP_SIZE - 150 || this.head.y < 150 || this.head.y > MAP_SIZE - 150) {
         const centerX = MAP_SIZE / 2;
         const centerY = MAP_SIZE / 2;
@@ -284,8 +457,29 @@
         if (screenX < -40 || screenX > canvas.width + 40 || screenY < -40 || screenY > canvas.height + 40) continue;
 
         ctx.beginPath();
-        ctx.arc(screenX, screenY, i === 0 ? this.radius + 2 : this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = i === 0 ? '#ffffff' : this.color;
+        const segRadius = Math.max(3, 12 * (1 - (i / this.segments.length) * 0.3));
+        ctx.arc(screenX, screenY, segRadius, 0, Math.PI * 2);
+
+        // Renderizado de Skins Exclusivas
+        if (this.skinId === 've') {
+          if (i % 3 === 0) ctx.fillStyle = '#ffcc00';
+          else if (i % 3 === 1) ctx.fillStyle = '#00247d';
+          else ctx.fillStyle = '#cf142b';
+        } else if (this.skinId === 'fuego') {
+          if (i % 3 === 0) ctx.fillStyle = '#ef4444';
+          else if (i % 3 === 1) ctx.fillStyle = '#f97316';
+          else ctx.fillStyle = '#eab308';
+        } else if (this.skinId === 'galaxia') {
+          if (i % 3 === 0) ctx.fillStyle = '#3b82f6';
+          else if (i % 3 === 1) ctx.fillStyle = '#a855f7';
+          else ctx.fillStyle = '#ec4899';
+        } else if (this.skinId === 'oro') {
+          if (i % 2 === 0) ctx.fillStyle = '#facc15';
+          else ctx.fillStyle = '#ca8a04';
+        } else {
+          ctx.fillStyle = this.color || '#22c55e';
+        }
+
         ctx.globalAlpha = gameState === 'PREP' ? 0.55 : 1.0;
         ctx.fill();
         ctx.closePath();
@@ -337,6 +531,17 @@
     if (gameState === 'ENDED') return;
     timeLeft--;
     
+    // Control dinámico de visibilidad del botón de Diseño según la fase
+    const skinBtn = document.getElementById('skin-btn');
+    if (skinBtn) {
+      if (gameState === 'PREP') {
+        skinBtn.style.display = 'block';
+      } else {
+        skinBtn.style.display = 'none';
+        cerrarModalDiseños();
+      }
+    }
+
     let minutes = Math.floor(timeLeft / 60).toString().padStart(2, '0');
     let seconds = (timeLeft % 60).toString().padStart(2, '0');
     document.getElementById('timer-display').innerText = `${minutes}:${seconds}`;
@@ -363,7 +568,7 @@
         const f = foods[i];
         if (Math.hypot(w.head.x - f.x, w.head.y - f.y) < w.radius + f.radius + 4) {
           w.targetLength += f.value * 0.8;
-          w.simMoney += f.value * 5; // Suma VES simulados
+          w.simMoney += f.value * 5;
           foods.splice(i, 1);
           if (foods.length < 250) spawnFood();
         }
@@ -429,6 +634,10 @@
   function volverAlDashboard() {
     window.location.href = 'dashboard.html';
   }
+
+  // Activamos de inicio el botón de diseño en la preparación
+  const skinBtnInit = document.getElementById('skin-btn');
+  if (skinBtnInit) skinBtnInit.style.display = 'block';
 
   function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);

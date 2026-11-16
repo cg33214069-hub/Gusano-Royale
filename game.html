@@ -28,9 +28,21 @@
     .hud-value.timer { color: #fbbf24; }
     .hud-value.alive { color: #f43f5e; }
 
+    /* Contenedor superior izquierdo para Salir y Diseño ordenados */
+    .top-left-controls {
+      position: absolute; top: 15px; left: 15px; display: flex; gap: 8px; z-index: 20;
+    }
+
     #leave-btn {
-      position: absolute; top: 15px; left: 15px; background: rgba(239, 68, 68, 0.2);
-      border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; z-index: 10;
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;
+    }
+
+    /* Botón de Diseño (Solo visible en preparación) */
+    #skin-btn {
+      background: rgba(56, 189, 248, 0.2);
+      border: 1px solid #38bdf8; color: #38bdf8; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;
+      display: none; /* Se activa mediante JS en preparación */
     }
 
     /* Botón de Turbo / Impulso táctil para Celular */
@@ -79,29 +91,31 @@
         overflow: hidden;
         position: fixed;
       }
+      .top-left-controls {
+        top: 10px;
+        left: 10px;
+        gap: 6px;
+      }
+      #leave-btn, #skin-btn {
+        padding: 6px 10px;
+        font-size: 0.7rem;
+      }
       .hud-bar {
         position: absolute;
         top: 10px;
         right: 10px;
         left: auto;
         transform: none;
-        padding: 5px 10px;
-        gap: 10px;
-        max-width: 65%;
+        padding: 5px 8px;
+        gap: 8px;
+        max-width: 55%;
         justify-content: space-around;
       }
       .hud-value {
-        font-size: 0.85rem;
+        font-size: 0.75rem;
       }
       .hud-label {
-        font-size: 0.5rem;
-      }
-      #leave-btn {
-        top: 10px;
-        left: 10px;
-        padding: 6px 12px;
-        font-size: 0.75rem;
-        z-index: 20;
+        font-size: 0.45rem;
       }
       #boost-btn {
         width: 75px;
@@ -116,8 +130,11 @@
 <body>
 
 <div id="game-container">
-  <!-- Botón de abandonar seguro -->
-  <button id="leave-btn" onclick="abandonarPartida()">Salir</button>
+  <!-- Controles superiores organizados (Salir + Diseño) -->
+  <div class="top-left-controls">
+    <button id="leave-btn" onclick="abandonarPartida()">Salir</button>
+    <button id="skin-btn" onclick="abrirModalDiseños()">Diseño</button>
+  </div>
 
   <div class="hud-bar">
     <div class="hud-item"><span class="hud-label" id="timer-label">Tiempo</span><span class="hud-value timer" id="timer-display">00:10</span></div>
@@ -135,6 +152,21 @@
 
   <!-- Botón táctil de Turbo para Celular -->
   <button id="boost-btn">TURBO</button>
+
+  <!-- Modal del Catálogo Completo de Diseños (Solo en Preparación) -->
+  <div class="modal-overlay" id="catalogo-skins-modal" style="display: none;">
+    <div class="modal" style="max-width: 420px;">
+      <h2>🎨 Elige tu Diseño</h2>
+      <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 15px;">Cambia tu skin o color en la cuenta regresiva</p>
+      
+      <!-- Cuadrícula con las opciones de diseño -->
+      <div id="grid-opciones-skins" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 220px; overflow-y: auto; margin-bottom: 20px; padding: 5px;">
+        <!-- Inyectado dinámicamente -->
+      </div>
+
+      <button class="btn-primary" onclick="cerrarModalDiseños()">Listo</button>
+    </div>
+  </div>
 
   <!-- Modal de Fin de Partida -->
   <div class="modal-overlay" id="end-modal" style="display: none;">
@@ -163,7 +195,7 @@
   let joystickActive = false;
   let joystickTouchId = null;
   let joystickCenter = { x: 0, y: 0 };
-  let joystickVector = { x: 0, y: 0 }; // Exportado globalmente para script.js
+  let joystickVector = { x: 0, y: 0 };
 
   const joystickBase = document.getElementById('joystick-base');
   const joystickStick = document.getElementById('joystick-stick');
@@ -173,7 +205,6 @@
     for (let i = 0; i < e.changedTouches.length; i++) {
       let touch = e.changedTouches[i];
       
-      // Si toca la mitad izquierda y el joystick no está activo
       if (touch.clientX < window.innerWidth / 2 && !joystickActive) {
         joystickActive = true;
         joystickTouchId = touch.identifier;
@@ -206,7 +237,7 @@
         let deltaY = touch.clientY - joystickCenter.y;
         
         let distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-        let maxRadius = 45; // Radio máximo de movimiento del joystick
+        let maxRadius = 45;
         
         if (distance > maxRadius) {
           deltaX = (deltaX / distance) * maxRadius;
@@ -238,6 +269,77 @@
       }
     }
   });
+
+  // --- CATÁLOGO DE DISEÑOS DISPONIBLES EN EL MODAL ---
+  // Catálogo completo de diseños, skins y colores exclusivos
+  const catalogoDisponibles = [
+    { id: 've', name: 'Venezuela (Tricolor)', type: 'skin', color: '#ffcc00', preview: 'linear-gradient(45deg, #ffcc00, #00247d, #cf142b)' },
+    { id: 'fuego', name: 'Llama de Fuego 🔥', type: 'skin', color: '#f97316', preview: 'linear-gradient(45deg, #ef4444, #f97316, #eab308)' },
+    { id: 'galaxia', name: 'Galaxia Neón 🌌', type: 'skin', color: '#a855f7', preview: 'linear-gradient(45deg, #3b82f6, #a855f7, #ec4899)' },
+    { id: 'oro', name: 'Oro Puro 👑', type: 'skin', color: '#eab308', preview: 'linear-gradient(45deg, #facc15, #ca8a04, #713f12)' },
+    { id: 'custom', name: 'Verde Pro 🟢', type: 'color', color: '#22c55e', preview: '#22c55e' },
+    { id: 'custom', name: 'Rojo Furia 🔴', type: 'color', color: '#ef4444', preview: '#ef4444' },
+    { id: 'custom', name: 'Azul Eléctrico 🔵', type: 'color', color: '#38bdf8', preview: '#38bdf8' },
+    { id: 'custom', name: 'Morado Neón 🟣', type: 'color', color: '#a855f7', preview: '#a855f7' },
+    { id: 'custom', name: 'Rosa Místico 💖', type: 'color', color: '#ec4899', preview: '#ec4899' },
+    { id: 'custom', name: 'Blanco Fantasma 👻', type: 'color', color: '#f8fafc', preview: '#f8fafc' }
+  ];
+
+  function abrirModalDiseños() {
+    // Verificamos si la fase global (definida en script.js) permite cambiar diseño
+    if (typeof currentPhase !== 'undefined' && currentPhase !== 'PREPARATION') {
+      alert("⚠️ Solo puedes cambiar tu diseño durante los segundos de preparación.");
+      return;
+    }
+
+    const grid = document.getElementById('grid-opciones-skins');
+    if (grid) {
+      grid.innerHTML = '';
+      catalogoDisponibles.forEach(item => {
+        const btn = document.createElement('div');
+        btn.style.cssText = `
+          background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+          padding: 10px; border-radius: 10px; cursor: pointer; text-align: center;
+          display: flex; flex-direction: column; align-items: center; gap: 6px;
+        `;
+        
+        const colorBox = document.createElement('div');
+        colorBox.style.cssText = `width: 30px; height: 30px; border-radius: 50%; background: ${item.preview}; border: 2px solid #fff;`;
+        
+        const label = document.createElement('span');
+        label.innerText = item.name;
+        label.style.cssText = 'font-size: 0.75rem; font-weight: bold; color: #fff;';
+
+        btn.appendChild(colorBox);
+        btn.appendChild(label);
+
+        btn.onclick = () => {
+          // Actualizamos variables globales si existen en el script
+          if (typeof selectedSkin !== 'undefined') selectedSkin = item.id;
+          if (typeof selectedColor !== 'undefined') selectedColor = item.color;
+          if (typeof player !== 'undefined' && player) {
+            player.skinId = item.id;
+            player.color = item.color;
+          }
+
+          localStorage.setItem('selected_skin', item.id);
+          localStorage.setItem('worm_color', item.color);
+
+          cerrarModalDiseños();
+        };
+
+        grid.appendChild(btn);
+      });
+    }
+
+    const modal = document.getElementById('catalogo-skins-modal');
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function cerrarModalDiseños() {
+    const modal = document.getElementById('catalogo-skins-modal');
+    if (modal) modal.style.display = 'none';
+  }
 
   // --- REGISTRO DE PRESENCIA EN VIVO EN LA SALA SELECCIONADA ---
   window.addEventListener('DOMContentLoaded', async () => {

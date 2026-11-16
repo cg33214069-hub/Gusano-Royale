@@ -115,7 +115,6 @@ let isBoosting = false;
 
 // --- CONTROL HÍBRIDO (MOUSE / TACTIL / JOYSTICK) ---
 window.addEventListener('mousemove', (e) => {
-  // Solo usa el mouse si no hay joystick activo en móviles
   if (typeof joystickVector === 'undefined' || (joystickVector.x === 0 && joystickVector.y === 0)) {
     mouse.x = e.clientX;
     mouse.y = e.clientY;
@@ -124,7 +123,6 @@ window.addEventListener('mousemove', (e) => {
 
 window.addEventListener('touchmove', (e) => {
   if (e.touches.length > 0) {
-    // Si toca la mitad derecha de la pantalla y no hay joystick flotante activo
     for (let i = 0; i < e.touches.length; i++) {
       let t = e.touches[i];
       if (t.clientX >= window.innerWidth / 2) {
@@ -414,7 +412,7 @@ function updateLocalPlayer() {
 // ==========================================
 // 4. RENDERIZADO Y LÍNEA DELIMITADORA
 // ==========================================
-function drawPlayer(p, camera, isLocal = false) {
+function drawPlayer(p, camera, isLocal) {
   if (!isLocal) {
     if (p.targetAngle !== undefined) {
       if (!p.x) p.x = p.targetX;
@@ -458,6 +456,17 @@ function drawPlayer(p, camera, isLocal = false) {
       if (i % 3 === 0) ctx.fillStyle = '#ffcc00';
       else if (i % 3 === 1) ctx.fillStyle = '#00247d';
       else ctx.fillStyle = '#cf142b';
+    } else if (p.skinId === 'fuego') {
+      if (i % 3 === 0) ctx.fillStyle = '#ef4444';
+      else if (i % 3 === 1) ctx.fillStyle = '#f97316';
+      else ctx.fillStyle = '#eab308';
+    } else if (p.skinId === 'galaxia') {
+      if (i % 3 === 0) ctx.fillStyle = '#3b82f6';
+      else if (i % 3 === 1) ctx.fillStyle = '#a855f7';
+      else ctx.fillStyle = '#ec4899';
+    } else if (p.skinId === 'oro') {
+      if (i % 2 === 0) ctx.fillStyle = '#facc15';
+      else ctx.fillStyle = '#ca8a04';
     } else {
       ctx.fillStyle = p.color || localStorage.getItem('worm_color') || (isLocal ? '#22c55e' : '#38bdf8');
     }
@@ -475,6 +484,7 @@ function drawPlayer(p, camera, isLocal = false) {
   }
 }
 
+  
 // ==========================================
 // FUNCIÓN: TABLA DE POSICIONES (LEADERBOARD)
 // ==========================================
@@ -566,6 +576,17 @@ function startTimer() {
     if (!gameActive) return;
     timeLeft--;
 
+    // Control dinámico de visibilidad del botón de Diseño según la fase
+    const skinBtn = document.getElementById('skin-btn');
+    if (skinBtn) {
+      if (currentPhase === 'PREPARATION') {
+        skinBtn.style.display = 'block';
+      } else {
+        skinBtn.style.display = 'none';
+        if (typeof cerrarModalDiseños === 'function') cerrarModalDiseños();
+      }
+    }
+
     if (timeLeft <= 0) {
       if (currentPhase === 'PREPARATION') {
         currentPhase = 'COMBAT';
@@ -654,6 +675,10 @@ function gameLoop(timestamp) {
 }
 
 gameActive = true;
+// Activamos el botón de diseño de entrada en la preparación
+const skinBtnInit = document.getElementById('skin-btn');
+if (skinBtnInit) skinBtnInit.style.display = 'block';
+
 startTimer();
 requestAnimationFrame(gameLoop);
 

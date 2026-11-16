@@ -576,7 +576,7 @@
       <div class="hero-section">
         <span class="hero-badge">⚡ Sistema de Lobby en Tiempo Real</span>
         <h1 class="hero-title">APUESTA, SOBREVIVE Y GANA BOLÍVARES</h1>
-        <p class="hero-desc">Ingresa en salas multijugador. Tienes 10 minutos de preparación sin comida ni muertes para posicionarte, seguidos de 60 minutos de combate letal.</p>
+        <p class="hero-desc">Ingresa en salas multijugador. Tienes 10 segundos de preparación sin comida ni muertes para posicionarte, seguidos de 60 segundos de combate letal.</p>
         <div style="display: flex; gap: 12px;">
           <button onclick="switchTab('deposit', event)" style="background: #0ea5e9; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer;">+ RECARGAR SALDO</button>
           <button onclick="switchTab('withdraw', event)" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); color: white; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer;">SOLICITAR RETIRO</button>
@@ -590,23 +590,21 @@
           <div class="stat-sub">Disponible para tus partidas</div>
         </div>
 
-        <div class="skins-card">
-          <div class="skins-header">
-            <div class="skins-title">🎨 Personalizar Gusano (100 Diseños)</div>
-            <div class="active-skin-badge" id="active-skin-badge">Equipado: Venezuela 🇻🇪</div>
-          </div>
-          <div class="skins-grid" id="skins-grid">
-            <!-- Se generan dinámicamente -->
-          </div>
-        </div>
-      </div>
+        
 
-      <!-- Botón de Sala de Práctica -->
-<div class="room-card practice-card">
-  <h3>Sala de Práctica (Gratis)</h3>
-  <p>Entra a entrenar contra bots sin arriesgar dinero real.</p>
-  <button onclick="window.location.href='practice.html'" class="btn-practice">
-    🎮 Jugar Gratis
+      <!-- TARJETA REDISEÑADA: SALA DE PRÁCTICA -->
+<div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 20px; margin-bottom: 25px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 15px; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);">
+  <div>
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+      <span style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; font-size: 0.7rem; font-weight: 800; padding: 3px 10px; border-radius: 20px; text-transform: uppercase;">Modo Entrenamiento</span>
+      <span style="color: #94a3b8; font-size: 0.8rem;">• Bots Activos</span>
+    </div>
+    <h3 style="font-size: 1.3rem; color: #ffffff; margin-bottom: 4px;">Sala de Práctica (Gratis)</h3>
+    <p style="color: #94a3b8; font-size: 0.85rem;">Entra a entrenar contra bots y prueba tus skins sin arriesgar dinero real.</p>
+  </div>
+
+  <button onclick="window.location.href='practice.html'" style="background: linear-gradient(90deg, #10b981 0%, #059669 100%); color: #ffffff; border: none; padding: 14px 28px; border-radius: 10px; font-weight: 800; font-size: 0.9rem; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); transition: transform 0.2s;">
+    🎮 JUGAR GRATIS
   </button>
 </div>
 
@@ -883,30 +881,6 @@
         name: `Skin Épica #${i}`,
         style: `linear-gradient(90deg, hsl(${hue}, 80%, 50%), hsl(${(hue + 40) % 360}, 80%, 40%))`
       });
-    }
-
-    function renderSkins() {
-      const grid = document.getElementById('skins-grid');
-      const currentSkin = localStorage.getItem('selected_skin') || 've';
-      
-      grid.innerHTML = SKINS_LIST.map(skin => {
-        const isSelected = skin.id === currentSkin;
-        if (isSelected) {
-          const badge = document.getElementById('active-skin-badge');
-          if (badge) badge.innerText = `Equipado: ${skin.name}`;
-        }
-        return `
-          <div class="skin-item ${isSelected ? 'selected' : ''}" onclick="selectSkin('${skin.id}', '${skin.name}')">
-            <div class="skin-preview" style="background: ${skin.style}"></div>
-            <div class="skin-name">${skin.name}</div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function selectSkin(skinId, skinName) {
-      localStorage.setItem('selected_skin', skinId);
-      renderSkins();
     }
 
     function switchTab(tabId, event) {
@@ -1222,7 +1196,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-      renderSkins();
+    
       loadUserData();
       selectPaymentMethod('pago_movil');
     });
