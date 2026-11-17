@@ -1,4 +1,15 @@
 // ==========================================
+// DETECCIÓN DE MODO ESPECTADOR (ADMIN)
+// ==========================================
+const isSpectator = Boolean(window.isSpectatorMode);
+const ROOM_ENTRY_MAP = {
+  'sala-1': 50,
+  'sala-2': 100,
+  'sala-3': 500,
+  'sala-4': 1000
+};
+
+// ==========================================
 // SISTEMA DE SALDO SEGURO (ANTI-TRAMPA / ANTI-HACKER)
 // ==========================================
 function getSecureBalance() {
@@ -17,6 +28,7 @@ function getSecureBalance() {
 }
 
 function saveSecureBalance(amount) {
+  if (isSpectator) return;
   const cleanAmount = Math.max(0, Math.floor(amount));
   localStorage.setItem('secure_user_balance', btoa(cleanAmount.toString()));
   localStorage.setItem('user_balance', cleanAmount.toString());
@@ -25,11 +37,8 @@ function saveSecureBalance(amount) {
 // ==========================================
 // 1. CONFIGURACIÓN DEL MUNDO Y COMIDA EN EL MAPA
 // ==========================================
-let WORLD_SIZE = 2500; // Valor por defecto inicial
+let WORLD_SIZE = 2500;
 
-// ==========================================
-// FUNCIÓN PARA LEER EL TAMAÑO GLOBAL DEL MAPA DESDE SUPABASE
-// ==========================================
 async function cargarTamanoMapaGlobal() {
   if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
 
@@ -45,7 +54,6 @@ async function cargarTamanoMapaGlobal() {
   }
 }
 
-// Ejecutamos la consulta al iniciar el script
 cargarTamanoMapaGlobal();
 const PREPARATION_TIME = 10; 
 const COMBAT_TIME = 60;      
@@ -67,7 +75,10 @@ function resizeCanvas() {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-let selectedEntryFee = parseInt(localStorage.getItem('selected_entry')) || 100;
+let selectedEntryFee = isSpectator
+  ? (ROOM_ENTRY_MAP[window.spectatorRoomId] || 50)
+  : (parseInt(localStorage.getItem('selected_entry')) || 100);
+
 let selectedSkin = localStorage.getItem('selected_skin') || 've';
 let selectedColor = localStorage.getItem('worm_color') || '#22c55e';
 let playerName = localStorage.getItem('player_name') || 'Jugador';
@@ -76,10 +87,25 @@ let currentPhase = 'PREPARATION';
 let timeLeft = PREPARATION_TIME;
 let timerInterval = null;
 
+// Variables exclusivas para cámara de espectador
+let spectateIndex = 0;
+let freeCamPos = { x: WORLD_SIZE / 2, y: WORLD_SIZE / 2 };
+
+// Cambiar de jugador observado al hacer clic/tap en modo espectador
+window.addEventListener('click', (e) => {
+  if (!isSpectator) return;
+  if (e.target && e.target.tagName === 'BUTTON') return;
+  const ids = Object.keys(remotePlayers);
+  if (ids.length > 0) {
+    spectateIndex = (spectateIndex + 1) % ids.length;
+  }
+});
+
 // ==========================================
 // DESCUENTO AUTOMÁTICO Y SEGURO DE LA ENTRADA EN SUPABASE
 // ==========================================
 async function descontarEntradaEnSupabase() {
+  if (isSpectator) return;
   if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
 
   const userId = localStorage.getItem('user_id');
@@ -125,7 +151,7 @@ window.addEventListener('touchmove', (e) => {
   if (e.touches.length > 0) {
     for (let i = 0; i < e.touches.length; i++) {
       let t = e.touches[i];
-      if (t.clientX >= window.innerWidth / 2) {
+      if (isSpectator || t.clientX >= window.innerWidth / 2) {
         mouse.x = t.clientX;
         mouse.y = t.clientY;
       }
@@ -134,14 +160,16 @@ window.addEventListener('touchmove', (e) => {
 }, { passive: true });
 
 window.addEventListener('keydown', (e) => {
+  if (isSpectator) return;
   if (e.code === 'Space') isBoosting = true;
 });
 window.addEventListener('keyup', (e) => {
+  if (isSpectator) return;
   if (e.code === 'Space') isBoosting = false;
 });
 
 const boostBtn = document.getElementById('boost-btn');
-if (boostBtn) {
+if (boostBtn && !isSpectator) {
   boostBtn.addEventListener('mousedown', () => isBoosting = true);
   boostBtn.addEventListener('mouseup', () => isBoosting = false);
   boostBtn.addEventListener('touchstart', (e) => { e.preventDefault(); isBoosting = true; }, { passive: false });
@@ -173,40 +201,40 @@ if (typeof io !== 'undefined') {
 }
 
 async function verificarYCargarComida() {
-    if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+  if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
 
-    const { data: configData } = await supabaseClient
-        .from('configuracion_juego')
-        .select('*');
+  const { data: configData } = await supabaseClient
+    .from('configuracion_juego')
+    .select('*');
 
-    if (configData) {
-        configData.forEach(item => {
-            if (item.clave === 'comida_activa') {
-                mapaComidaActiva = (item.valor === 'true' || item.valor === true);
-            }
-            if (item.clave === 'cantidad_comida') {
-                cantidadComidaConfig = parseInt(item.valor) || 150;
-            }
-            if (item.clave === 'valor_comida_ves') {
-                valorComidaConfig = parseFloat(item.valor) || 10.00;
-            }
-        });
+  if (configData) {
+    configData.forEach(item => {
+      if (item.clave === 'comida_activa') {
+        mapaComidaActiva = (item.valor === 'true' || item.valor === true);
+      }
+      if (item.clave === 'cantidad_comida') {
+        cantidadComidaConfig = parseInt(item.valor) || 150;
+      }
+      if (item.clave === 'valor_comida_ves') {
+        valorComidaConfig = parseFloat(item.valor) || 10.00;
+      }
+    });
+  }
+
+  if (mapaComidaActiva) {
+    arenaFoodOrbs = [];
+    for (let i = 0; i < cantidadComidaConfig; i++) {
+      arenaFoodOrbs.push({
+        x: Math.random() * (WORLD_SIZE - 200) + 100,
+        y: Math.random() * (WORLD_SIZE - 200) + 100,
+        ves: valorComidaConfig,
+        radius: 5,
+        color: valorComidaConfig > 50 ? '#4ade80' : '#38bdf8'
+      });
     }
-
-    if (mapaComidaActiva) {
-        arenaFoodOrbs = [];
-        for (let i = 0; i < cantidadComidaConfig; i++) {
-            arenaFoodOrbs.push({
-                x: Math.random() * (WORLD_SIZE - 200) + 100,
-                y: Math.random() * (WORLD_SIZE - 200) + 100,
-                ves: valorComidaConfig,
-                radius: 5,
-                color: valorComidaConfig > 50 ? '#4ade80' : '#38bdf8'
-            });
-        }
-    } else {
-        arenaFoodOrbs = [];
-    }
+  } else {
+    arenaFoodOrbs = [];
+  }
 }
 
 if (typeof supabaseClient !== 'undefined' && supabaseClient) {
@@ -217,12 +245,20 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
   gameRoom.on('broadcast', { event: 'player_move' }, ({ payload }) => {
     if (payload.id !== myPlayerId) {
       if (!remotePlayers[payload.id]) {
-        remotePlayers[payload.id] = payload;
+        remotePlayers[payload.id] = {
+          ...payload,
+          targetX: payload.x,
+          targetY: payload.y,
+          targetAngle: payload.angle,
+          currentSpeed: payload.speed || 3.5,
+          targetBody: payload.body
+        };
       } else {
         let p = remotePlayers[payload.id];
         p.targetX = payload.x;
         p.targetY = payload.y;
         p.targetAngle = payload.angle;
+        p.currentSpeed = payload.speed || 3.5;
         p.ves = payload.ves;
         p.skinId = payload.skinId;
         p.color = payload.color;
@@ -250,7 +286,7 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
 
   gameRoom.subscribe((status) => {
     if (status === 'SUBSCRIBED') {
-      console.log(`¡Conectado a la sala aislada [${roomChannelName}]!`);
+      console.log(`¡Conectado a la sala aislada [${roomChannelName}]${isSpectator ? ' (MODO ESPECTADOR)' : ''}!`);
       verificarYCargarComida();
     }
   });
@@ -269,17 +305,20 @@ let player = {
   radius: 12,
   body: [],
   length: 20,
-  ves: selectedEntryFee, 
+  ves: isSpectator ? 0 : selectedEntryFee, 
   skinId: selectedSkin,
   color: selectedColor,
-  alive: true
+  alive: !isSpectator
 };
 
-for (let i = 0; i < player.length; i++) {
-  player.body.push({ x: player.x, y: player.y });
+if (!isSpectator) {
+  for (let i = 0; i < player.length; i++) {
+    player.body.push({ x: player.x, y: player.y });
+  }
 }
 
 function dropLootOnDeath(x, y, totalVes) {
+  if (isSpectator) return;
   const drops = 12;
   const valuePerDrop = Math.floor(totalVes / drops);
 
@@ -309,7 +348,7 @@ function dropLootOnDeath(x, y, totalVes) {
 let lastSendTime = 0;
 
 function updateLocalPlayer() {
-  if (!player.alive) return;
+  if (isSpectator || !player.alive) return;
 
   player.radius = 10 + Math.min(20, Math.sqrt(player.ves) * 0.25);
   player.length = Math.floor(15 + player.ves / (selectedEntryFee / 20));
@@ -321,7 +360,6 @@ function updateLocalPlayer() {
     player.ves -= (selectedEntryFee * 0.0005);
   }
 
-  // --- CÁLCULO DE ÁNGULO: JOYSTICK FLOTANTE O MOUSE ---
   let targetAngle = player.angle;
   if (typeof joystickVector !== 'undefined' && (joystickVector.x !== 0 || joystickVector.y !== 0)) {
     targetAngle = Math.atan2(joystickVector.y, joystickVector.x);
@@ -388,7 +426,8 @@ function updateLocalPlayer() {
 
   if (gameRoom && gameActive) {
     const now = Date.now();
-    if (now - lastSendTime > 100) {
+    // Enviamos posición cada 50ms (20 veces/seg) para eliminar saltos visuales
+    if (now - lastSendTime > 50) {
       lastSendTime = now;
       gameRoom.send({
         type: 'broadcast',
@@ -399,10 +438,11 @@ function updateLocalPlayer() {
           x: player.x,
           y: player.y,
           angle: player.angle,
+          speed: currentSpeed,
           ves: player.ves,
           skinId: player.skinId,
           color: player.color,
-          body: player.body.slice(0, 15)
+          body: player.body.slice(0, 20)
         }
       });
     }
@@ -412,84 +452,112 @@ function updateLocalPlayer() {
 // ==========================================
 // 4. RENDERIZADO Y LÍNEA DELIMITADORA
 // ==========================================
+// ==========================================
+// 4. RENDERIZADO Y LÍNEA CONTINUA (FLUIDO / TIPO SEDA)
+// ==========================================
 function drawPlayer(p, camera, isLocal) {
   if (!isLocal) {
-    if (p.targetAngle !== undefined) {
-      if (!p.x) p.x = p.targetX;
-      if (!p.y) p.y = p.targetY;
-
-      const remoteSpeed = 3.5;
-      p.x += Math.cos(p.targetAngle) * remoteSpeed;
-      p.y += Math.sin(p.targetAngle) * remoteSpeed;
-
-      if (p.targetX !== undefined && p.targetY !== undefined) {
-        p.x += (p.targetX - p.x) * 0.1;
-        p.y += (p.targetY - p.y) * 0.1;
+    if (p.targetX !== undefined && p.targetY !== undefined) {
+      if (p.x === undefined || p.y === undefined) {
+        p.x = p.targetX;
+        p.y = p.targetY;
+      } else {
+        const dist = Math.hypot(p.targetX - p.x, p.targetY - p.y);
+        if (dist > 250) {
+          p.x = p.targetX;
+          p.y = p.targetY;
+        } else {
+          const spd = p.currentSpeed || 3.5;
+          if (p.targetAngle !== undefined) {
+            p.x += Math.cos(p.targetAngle) * spd;
+            p.y += Math.sin(p.targetAngle) * spd;
+            p.targetX += Math.cos(p.targetAngle) * spd;
+            p.targetY += Math.sin(p.targetAngle) * spd;
+          }
+          p.x += (p.targetX - p.x) * 0.15;
+          p.y += (p.targetY - p.y) * 0.15;
+        }
       }
     }
+
     if (p.targetBody && Array.isArray(p.targetBody)) {
-      if (!p.body || p.body.length === 0) {
-        p.body = JSON.parse(JSON.stringify(p.targetBody));
+      if (!p.body || p.body.length !== p.targetBody.length) {
+        p.body = p.targetBody.map(seg => ({ x: seg.x, y: seg.y }));
       } else {
-        for (let i = 0; i < Math.min(p.body.length, p.targetBody.length); i++) {
-          p.body[i].x += (p.targetBody[i].x - p.body[i].x) * 0.2;
-          p.body[i].y += (p.targetBody[i].y - p.body[i].y) * 0.2;
+        p.body[0].x = p.x;
+        p.body[0].y = p.y;
+        for (let i = 1; i < p.body.length; i++) {
+          const prev = p.body[i - 1];
+          const curr = p.body[i];
+          const targetSeg = p.targetBody[i];
+          curr.x += ((prev.x + targetSeg.x) * 0.5 - curr.x) * 0.35;
+          curr.y += ((prev.y + targetSeg.y) * 0.5 - curr.y) * 0.35;
         }
       }
     }
   }
 
-  if (!p.body || p.body.length === 0) return;
+  if (!p.body || p.body.length < 2) return;
 
-  for (let i = p.body.length - 1; i >= 0; i--) {
+  // --- DIBUJAR CUERPO CONTINUO (FRANJA CORRIDA / TIPO SEDA) ---
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const wormRadius = Math.max(8, 12 * Math.min(1.5, 1 + Math.sqrt(p.ves || 0) * 0.05));
+  ctx.lineWidth = wormRadius * 2;
+
+  // Color o Skin del gusano
+  if (p.skinId === 've') {
+    ctx.strokeStyle = '#ffcc00'; // Color base tricolor
+  } else if (p.skinId === 'fuego') {
+    ctx.strokeStyle = '#f97316';
+  } else if (p.skinId === 'galaxia') {
+    ctx.strokeStyle = '#a855f7';
+  } else if (p.skinId === 'oro') {
+    ctx.strokeStyle = '#eab308';
+  } else {
+    ctx.strokeStyle = p.color || localStorage.getItem('worm_color') || (isLocal ? '#22c55e' : '#38bdf8');
+  }
+
+  ctx.beginPath();
+  let firstValid = false;
+  for (let i = 0; i < p.body.length; i++) {
     const seg = p.body[i];
     const screenX = seg.x - camera.x;
     const screenY = seg.y - camera.y;
 
-    if (screenX < -40 || screenX > canvas.width + 40 || screenY < -40 || screenY > canvas.height + 40) continue;
-
-    ctx.beginPath();
-    const segRadius = Math.max(3, 12 * (1 - (i / p.body.length) * 0.3));
-    ctx.arc(screenX, screenY, segRadius, 0, Math.PI * 2);
-
-    if (p.skinId === 've') {
-      if (i % 3 === 0) ctx.fillStyle = '#ffcc00';
-      else if (i % 3 === 1) ctx.fillStyle = '#00247d';
-      else ctx.fillStyle = '#cf142b';
-    } else if (p.skinId === 'fuego') {
-      if (i % 3 === 0) ctx.fillStyle = '#ef4444';
-      else if (i % 3 === 1) ctx.fillStyle = '#f97316';
-      else ctx.fillStyle = '#eab308';
-    } else if (p.skinId === 'galaxia') {
-      if (i % 3 === 0) ctx.fillStyle = '#3b82f6';
-      else if (i % 3 === 1) ctx.fillStyle = '#a855f7';
-      else ctx.fillStyle = '#ec4899';
-    } else if (p.skinId === 'oro') {
-      if (i % 2 === 0) ctx.fillStyle = '#facc15';
-      else ctx.fillStyle = '#ca8a04';
+    if (i === 0) {
+      ctx.moveTo(screenX, screenY);
+      firstValid = true;
     } else {
-      ctx.fillStyle = p.color || localStorage.getItem('worm_color') || (isLocal ? '#22c55e' : '#38bdf8');
+      ctx.lineTo(screenX, screenY);
     }
-    ctx.fill();
   }
 
+  if (firstValid) {
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Nombre y puntaje sobre la cabeza
   const headX = p.x - camera.x;
   const headY = p.y - camera.y;
 
-  if (headX >= -40 && headX <= canvas.width + 40 && headY >= -40 && headY <= canvas.height + 40) {
+  if (headX >= -60 && headX <= canvas.width + 60 && headY >= -60 && headY <= canvas.height + 60) {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`${p.name} (${Math.floor(p.ves)} VES)`, headX, headY - 18);
+    ctx.fillText(`${p.name} (${Math.floor(p.ves)} VES)`, headX, headY - (wormRadius + 8));
   }
 }
-
-  
 // ==========================================
 // FUNCIÓN: TABLA DE POSICIONES (LEADERBOARD)
 // ==========================================
 function drawLeaderboard() {
-  let allPlayers = [{ name: player.name, ves: player.ves, isLocal: true }];
+  let allPlayers = [];
+  if (!isSpectator && player.alive) {
+    allPlayers.push({ name: player.name, ves: player.ves, isLocal: true });
+  }
   Object.values(remotePlayers).forEach(rp => {
     allPlayers.push({ name: rp.name || 'Jugador', ves: rp.ves || 0, isLocal: false });
   });
@@ -499,7 +567,7 @@ function drawLeaderboard() {
   const startX = canvas.width - 210;
   const startY = 80;
   const width = 190;
-  const height = 30 + (Math.min(5, allPlayers.length) * 24);
+  const height = Math.max(54, 30 + (Math.min(5, allPlayers.length) * 24));
 
   ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
   ctx.fillRect(startX, startY, width, height);
@@ -513,6 +581,12 @@ function drawLeaderboard() {
   ctx.fillText('🏆 TOP RECOLECTORES', startX + 12, startY + 20);
 
   ctx.font = '11px sans-serif';
+  if (allPlayers.length === 0) {
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText('Esperando jugadores...', startX + 12, startY + 42);
+    return;
+  }
+
   for (let i = 0; i < Math.min(5, allPlayers.length); i++) {
     const p = allPlayers[i];
     const yPos = startY + 42 + (i * 22);
@@ -527,15 +601,18 @@ function drawLeaderboard() {
   }
 }
 
-function checkRealPlayerCollisions() {
-  if (currentPhase !== 'COMBAT' || !player.alive) return;
-
+function cleanupInactiveRemotePlayers() {
   const now = Date.now();
   Object.keys(remotePlayers).forEach(id => {
     if (now - remotePlayers[id].lastUpdate > 3000) {
       delete remotePlayers[id];
     }
   });
+}
+
+function checkRealPlayerCollisions() {
+  cleanupInactiveRemotePlayers();
+  if (isSpectator || currentPhase !== 'COMBAT' || !player.alive) return;
 
   Object.values(remotePlayers).forEach(friend => {
     if (!friend.body) return;
@@ -555,14 +632,27 @@ function checkRealPlayerCollisions() {
   });
 }
 
-function updateHUD() {
+function updateHUD(observedPlayer) {
   const vesDisplay = document.getElementById('ves-display');
   const aliveDisplay = document.getElementById('alive-display');
   const timerDisplay = document.getElementById('timer-display');
+  const badge = document.getElementById('spectator-badge');
   
-  const totalConnected = Object.keys(remotePlayers).length + (player.alive ? 1 : 0);
+  const totalConnected = Object.keys(remotePlayers).length + ((!isSpectator && player.alive) ? 1 : 0);
 
-  if (vesDisplay) vesDisplay.innerText = `${Math.floor(player.ves).toLocaleString()} VES`;
+  if (isSpectator) {
+    if (vesDisplay) {
+      vesDisplay.innerText = observedPlayer ? `${Math.floor(observedPlayer.ves || 0).toLocaleString()} VES` : `Sala ${selectedEntryFee}`;
+    }
+    if (badge) {
+      badge.innerText = observedPlayer
+        ? `👁️ VIENDO A: ${observedPlayer.name} (Clic para cambiar)`
+        : `👁️ MODO ESPECTADOR - SALA LIBRE (Mueve el cursor para explorar)`;
+    }
+  } else {
+    if (vesDisplay) vesDisplay.innerText = `${Math.floor(player.ves).toLocaleString()} VES`;
+  }
+
   if (aliveDisplay) aliveDisplay.innerText = `${totalConnected} Activos en la Sala`;
 
   const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
@@ -576,9 +666,8 @@ function startTimer() {
     if (!gameActive) return;
     timeLeft--;
 
-    // Control dinámico de visibilidad del botón de Diseño según la fase
     const skinBtn = document.getElementById('skin-btn');
-    if (skinBtn) {
+    if (skinBtn && !isSpectator) {
       if (currentPhase === 'PREPARATION') {
         skinBtn.style.display = 'block';
       } else {
@@ -592,7 +681,12 @@ function startTimer() {
         currentPhase = 'COMBAT';
         timeLeft = COMBAT_TIME;      
       } else {
-        endGame(true, "¡Sobreviviste a la ronda! Te llevas todo tu botín recolectado.");
+        if (isSpectator) {
+          currentPhase = 'PREPARATION';
+          timeLeft = PREPARATION_TIME;
+        } else {
+          endGame(true, "¡Sobreviviste a la ronda! Te llevas todo tu botín recolectado.");
+        }
       }
     }
   }, 1000);
@@ -612,11 +706,38 @@ function gameLoop(timestamp) {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (gameActive && player.alive) {
-      updateLocalPlayer();
+    if (gameActive && (player.alive || isSpectator)) {
+      if (!isSpectator) {
+        updateLocalPlayer();
+      }
       checkRealPlayerCollisions();
 
-      const camera = { x: player.x - canvas.width / 2, y: player.y - canvas.height / 2 };
+      const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
+      let camera = { x: 0, y: 0 };
+      let observedPlayer = null;
+
+      if (isSpectator) {
+        const remoteList = Object.values(remotePlayers);
+        if (remoteList.length > 0) {
+          if (spectateIndex >= remoteList.length) spectateIndex = 0;
+          observedPlayer = remoteList[spectateIndex];
+          freeCamPos.x = observedPlayer.x || mapSizeSafe / 2;
+          freeCamPos.y = observedPlayer.y || mapSizeSafe / 2;
+        } else {
+          const dx = mouse.x - canvas.width / 2;
+          const dy = mouse.y - canvas.height / 2;
+          if (Math.hypot(dx, dy) > 40) {
+            const angle = Math.atan2(dy, dx);
+            freeCamPos.x = Math.max(0, Math.min(mapSizeSafe, freeCamPos.x + Math.cos(angle) * 5));
+            freeCamPos.y = Math.max(0, Math.min(mapSizeSafe, freeCamPos.y + Math.sin(angle) * 5));
+          }
+        }
+        camera.x = freeCamPos.x - canvas.width / 2;
+        camera.y = freeCamPos.y - canvas.height / 2;
+      } else {
+        camera.x = player.x - canvas.width / 2;
+        camera.y = player.y - canvas.height / 2;
+      }
 
       // Cuadrícula de fondo
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
@@ -628,10 +749,7 @@ function gameLoop(timestamp) {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
       }
 
-      // ==========================================
-      // LÍNEA AZUL DELIMITADORA DINÁMICA Y SEGURA
-      // ==========================================
-      const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
+      // Línea azul delimitadora del mapa
       const mapScreenX = 0 - camera.x;
       const mapScreenY = 0 - camera.y;
 
@@ -664,20 +782,21 @@ function gameLoop(timestamp) {
       });
 
       Object.values(remotePlayers).forEach(friend => drawPlayer(friend, camera, false));
-      drawPlayer(player, camera, true);
+      
+      if (!isSpectator) {
+        drawPlayer(player, camera, true);
+      }
 
-      // Renderizar la tabla de posiciones
       drawLeaderboard();
 
-      updateHUD();
+      updateHUD(observedPlayer);
     }
   }
 }
 
 gameActive = true;
-// Activamos el botón de diseño de entrada en la preparación
 const skinBtnInit = document.getElementById('skin-btn');
-if (skinBtnInit) skinBtnInit.style.display = 'block';
+if (skinBtnInit && !isSpectator) skinBtnInit.style.display = 'block';
 
 startTimer();
 requestAnimationFrame(gameLoop);
@@ -686,6 +805,8 @@ requestAnimationFrame(gameLoop);
 // FUNCIÓN ENDGAME OPTIMIZADA PARA GUARDAR EL PREMIO
 // ==========================================
 async function endGame(survived, reason) {
+  if (isSpectator) return;
+
   gameActive = false;
   clearInterval(timerInterval);
 

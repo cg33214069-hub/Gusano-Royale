@@ -9,7 +9,7 @@
   <!-- SCRIPT DE SEGURIDAD Y CONTRASEÑA ADMIN     -->
   <!-- ========================================== -->
   <script>
-    const ADMIN_PASSWORD = "Cesar2026*gusano"; 
+    const ADMIN_PASSWORD = "2026*"; 
 
     if (sessionStorage.getItem('admin_authenticated') !== 'true') {
       let userEntry = prompt("🔒 ACCESO RESTRINGIDO\nIngresa la contraseña de administrador:");
@@ -371,6 +371,28 @@
   <p id="total-platform-money" style="font-size: 28px; font-weight: bold; color: #38bdf8;">Calculando...</p>
 </div>
 
+<div style="background: rgba(15, 23, 42, 0.9); border: 1px solid #38bdf8; border-radius: 14px; padding: 18px; margin-top: 20px;">
+  <h3 style="color: #38bdf8; margin-bottom: 12px; font-size: 1rem;">👁️ Monitoreo en Vivo (Solo Admin)</h3>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
+    <button onclick="verSalaAdmin('sala-1')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #fff; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Sala Principiantes</button>
+    <button onclick="verSalaAdmin('sala-2')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #fff; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Sala Media</button>
+    <button onclick="verSalaAdmin('sala-3')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #fff; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Sala Profesional</button>
+    <button onclick="verSalaAdmin('sala-4')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #fff; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Sala VIP SBRk</button>
+  </div>
+</div>
+
+<script>
+  function verSalaAdmin(roomId) {
+    window.location.href = `game.html?room=${roomId}&spectator=true`;
+  }
+
+  function verSalaAdmin(roomId) {
+  // Guardamos el pase de administrador antes de entrar a la arena
+  sessionStorage.setItem('gusanos_admin_auth', 'true');
+  window.location.href = `game.html?room=${roomId}&spectator=true`;
+}
+
+</script>
     <!-- BUSCADOR RÁPIDO DE USUARIOS Y SALDO -->
     <div class="search-box-card">
       <h2 style="font-size: 1rem; color: #38bdf8; text-transform: uppercase;">🔍 Búsqueda y Gestión Rápida de Saldo de Usuario</h2>

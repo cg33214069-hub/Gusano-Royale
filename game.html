@@ -28,6 +28,16 @@
     .hud-value.timer { color: #fbbf24; }
     .hud-value.alive { color: #f43f5e; }
 
+    /* Etiqueta de Modo Espectador (Solo visible para Admin) */
+    #spectator-badge {
+      display: none;
+      position: absolute; top: 75px; left: 50%; transform: translateX(-50%);
+      background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8;
+      color: #38bdf8; padding: 5px 14px; border-radius: 20px;
+      font-size: 0.75rem; font-weight: 800; letter-spacing: 0.5px; z-index: 15;
+      backdrop-filter: blur(6px);
+    }
+
     /* Contenedor superior izquierdo para Salir y Diseño ordenados */
     .top-left-controls {
       position: absolute; top: 15px; left: 15px; display: flex; gap: 8px; z-index: 20;
@@ -42,7 +52,7 @@
     #skin-btn {
       background: rgba(56, 189, 248, 0.2);
       border: 1px solid #38bdf8; color: #38bdf8; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;
-      display: none; /* Se activa mediante JS en preparación */
+      display: none;
     }
 
     /* Botón de Turbo / Impulso táctil para Celular */
@@ -54,7 +64,7 @@
       box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); text-transform: uppercase;
     }
     @media (min-width: 768px) {
-      #boost-btn { display: none; } /* En PC se usa la barra espaciadora */
+      #boost-btn { display: none; }
     }
 
     /* --- ESTILOS DEL JOYSTICK FLOTANTE --- */
@@ -68,10 +78,9 @@
       background: rgba(56, 189, 248, 0.6); box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
     }
     @media (min-width: 768px) {
-      #joystick-base { display: none !important; } /* En PC se usa el mouse o teclado */
+      #joystick-base { display: none !important; }
     }
 
-    /* Ocultamos el minimap por diseño */
     #minimap { display: none; }
 
     .modal-overlay {
@@ -117,6 +126,11 @@
       .hud-label {
         font-size: 0.45rem;
       }
+      #spectator-badge {
+        top: 52px;
+        font-size: 0.65rem;
+        padding: 4px 10px;
+      }
       #boost-btn {
         width: 75px;
         height: 75px;
@@ -142,6 +156,9 @@
     <div class="hud-item"><span class="hud-label">Vivos</span><span class="hud-value alive" id="alive-display">100 / 100</span></div>
   </div>
 
+  <!-- Insignia visible solo cuando el administrador está espectando -->
+  <div id="spectator-badge">👁️ MODO ESPECTADOR (ADMIN)</div>
+
   <canvas id="gameCanvas"></canvas>
   <canvas id="minimap"></canvas>
 
@@ -159,9 +176,7 @@
       <h2>🎨 Elige tu Diseño</h2>
       <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 15px;">Cambia tu skin o color en la cuenta regresiva</p>
       
-      <!-- Cuadrícula con las opciones de diseño -->
       <div id="grid-opciones-skins" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 220px; overflow-y: auto; margin-bottom: 20px; padding: 5px;">
-        <!-- Inyectado dinámicamente -->
       </div>
 
       <button class="btn-primary" onclick="cerrarModalDiseños()">Listo</button>
@@ -188,6 +203,23 @@
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+  // --- CONFIGURACIÓN DE MODO ESPECTADOR EXCLUSIVO PARA ADMIN ---
+  const urlParams = new URLSearchParams(window.location.search);
+  window.isSpectatorMode = urlParams.get('spectator') === 'true';
+  window.spectatorRoomId = urlParams.get('room') || localStorage.getItem('selected_room') || 'sala-1';
+
+  // Si entra como espectador, ocultamos controles táctiles y ajustamos interfaz
+  if (window.isSpectatorMode) {
+    const boostBtn = document.getElementById('boost-btn');
+    const skinBtn = document.getElementById('skin-btn');
+    const badge = document.getElementById('spectator-badge');
+    const leaveBtn = document.getElementById('leave-btn');
+    if (boostBtn) boostBtn.style.display = 'none';
+    if (skinBtn) skinBtn.style.display = 'none';
+    if (badge) badge.style.display = 'block';
+    if (leaveBtn) leaveBtn.innerText = 'Volver al Admin';
+  }
+
   window.isPreparingTimerActive = true;
   setTimeout(() => { window.isPreparingTimerActive = false; }, 10000);
 
@@ -200,24 +232,21 @@
   const joystickBase = document.getElementById('joystick-base');
   const joystickStick = document.getElementById('joystick-stick');
 
-  // Control táctil para la mitad izquierda de la pantalla
+  // Control táctil (desactivado si estás en modo espectador)
   window.addEventListener('touchstart', (e) => {
+    if (window.isSpectatorMode) return;
     for (let i = 0; i < e.changedTouches.length; i++) {
       let touch = e.changedTouches[i];
-      
       if (touch.clientX < window.innerWidth / 2 && !joystickActive) {
         joystickActive = true;
         joystickTouchId = touch.identifier;
-        
         joystickCenter.x = touch.clientX;
         joystickCenter.y = touch.clientY;
-        
         if (joystickBase) {
           joystickBase.style.left = `${touch.clientX}px`;
           joystickBase.style.top = `${touch.clientY}px`;
           joystickBase.style.display = 'block';
         }
-        
         if (joystickStick) {
           joystickStick.style.transform = `translate(0px, 0px)`;
         }
@@ -227,27 +256,21 @@
   }, { passive: false });
 
   window.addEventListener('touchmove', (e) => {
-    if (!joystickActive) return;
-    
+    if (window.isSpectatorMode || !joystickActive) return;
     for (let i = 0; i < e.changedTouches.length; i++) {
       let touch = e.changedTouches[i];
-      
       if (touch.identifier === joystickTouchId) {
         let deltaX = touch.clientX - joystickCenter.x;
         let deltaY = touch.clientY - joystickCenter.y;
-        
         let distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
         let maxRadius = 45;
-        
         if (distance > maxRadius) {
           deltaX = (deltaX / distance) * maxRadius;
           deltaY = (deltaY / distance) * maxRadius;
         }
-        
         if (joystickStick) {
           joystickStick.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
         }
-        
         let normDist = Math.min(distance, maxRadius) / maxRadius;
         joystickVector.x = (distance > 0 ? (deltaX / distance) : 0) * normDist;
         joystickVector.y = (distance > 0 ? (deltaY / distance) : 0) * normDist;
@@ -257,10 +280,8 @@
 
   window.addEventListener('touchend', (e) => {
     if (!joystickActive) return;
-    
     for (let i = 0; i < e.changedTouches.length; i++) {
       let touch = e.changedTouches[i];
-      
       if (touch.identifier === joystickTouchId) {
         joystickActive = false;
         joystickTouchId = null;
@@ -271,7 +292,6 @@
   });
 
   // --- CATÁLOGO DE DISEÑOS DISPONIBLES EN EL MODAL ---
-  // Catálogo completo de diseños, skins y colores exclusivos
   const catalogoDisponibles = [
     { id: 've', name: 'Venezuela (Tricolor)', type: 'skin', color: '#ffcc00', preview: 'linear-gradient(45deg, #ffcc00, #00247d, #cf142b)' },
     { id: 'fuego', name: 'Llama de Fuego 🔥', type: 'skin', color: '#f97316', preview: 'linear-gradient(45deg, #ef4444, #f97316, #eab308)' },
@@ -286,7 +306,7 @@
   ];
 
   function abrirModalDiseños() {
-    // Verificamos si la fase global (definida en script.js) permite cambiar diseño
+    if (window.isSpectatorMode) return;
     if (typeof currentPhase !== 'undefined' && currentPhase !== 'PREPARATION') {
       alert("⚠️ Solo puedes cambiar tu diseño durante los segundos de preparación.");
       return;
@@ -314,17 +334,14 @@
         btn.appendChild(label);
 
         btn.onclick = () => {
-          // Actualizamos variables globales si existen en el script
           if (typeof selectedSkin !== 'undefined') selectedSkin = item.id;
           if (typeof selectedColor !== 'undefined') selectedColor = item.color;
           if (typeof player !== 'undefined' && player) {
             player.skinId = item.id;
             player.color = item.color;
           }
-
           localStorage.setItem('selected_skin', item.id);
           localStorage.setItem('worm_color', item.color);
-
           cerrarModalDiseños();
         };
 
@@ -341,8 +358,24 @@
     if (modal) modal.style.display = 'none';
   }
 
-  // --- REGISTRO DE PRESENCIA EN VIVO EN LA SALA SELECCIONADA ---
+  // --- VERIFICACIÓN DE ADMIN (POR CONTRASEÑA EN PANEL) Y PRESENCIA EN VIVO ---
   window.addEventListener('DOMContentLoaded', async () => {
+    // 1. Si viene con ?spectator=true, verificamos que venga desde tu panel de admin
+    if (window.isSpectatorMode) {
+      const isAdminAuthenticated = sessionStorage.getItem('gusanos_admin_auth') === 'true';
+
+      if (!isAdminAuthenticated) {
+        // Si alguien intenta entrar poniendo ?spectator=true sin pasar por tu panel, lo saca al dashboard
+        window.location.href = 'dashboard.html';
+        return;
+      }
+
+      // Eres tú: fijamos la sala elegida sin registrar presencia como jugador
+      localStorage.setItem('selected_room', window.spectatorRoomId);
+      return;
+    }
+
+    // 2. Flujo normal para jugadores (registra presencia en la sala)
     const salaElegida = localStorage.getItem('selected_room') || 'sala-1';
     const userId = localStorage.getItem('user_id') || 'jugador_' + Math.random();
 
@@ -361,6 +394,13 @@
   });
 
   async function abandonarPartida() {
+    // Si eres admin espectando, vuelves directo a tu panel sin alertas de pérdida
+    if (window.isSpectatorMode) {
+      localStorage.removeItem('selected_room');
+      window.location.href = 'admin.html';
+      return;
+    }
+
     if (confirm("¿Estás seguro de abandonar la partida? Perderás el dinero de la entrada.")) {
       if (window.currentRoomChannel) {
         await window.currentRoomChannel.untrack();
@@ -373,6 +413,12 @@
 
   // FUNCIÓN OPTIMIZADA PARA SUMAR GANANCIAS EN SUPABASE
   async function finishGameAndReward(amountWon) {
+    // Si es espectador, nunca modifica saldos ni muestra modal de cobro
+    if (window.isSpectatorMode) {
+      window.location.href = 'admin.html';
+      return;
+    }
+
     const userId = localStorage.getItem('user_id');
     const userEmail = localStorage.getItem('user_email');
     
