@@ -766,6 +766,26 @@
   </main>
 
   <script>
+    // --- ESCUDO ANTI-TRAMPAS PARA USUARIOS EN DASHBOARD ---
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'F12') {
+    e.preventDefault();
+    return false;
+  }
+  if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) {
+    e.preventDefault();
+    return false;
+  }
+  if (e.ctrlKey && e.key === 'u') {
+    e.preventDefault();
+    return false;
+  }
+});
+
+document.addEventListener('contextmenu', function(e) {
+  e.preventDefault();
+});
+
     const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
     
