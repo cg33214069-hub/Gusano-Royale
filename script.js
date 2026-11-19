@@ -189,6 +189,13 @@ let cantidadComidaConfig = 150;
 let valorComidaConfig = 10.00;
 let arenaFoodOrbs = []; 
 
+const FOOD_COLORS = ['#38bdf8', '#4ade80', '#facc15', '#f97316', '#e879f9', '#f43f5e', '#2dd4bf'];
+const FOOD_RADIUS = 3.5;
+
+function getRandomFoodColor() {
+  return FOOD_COLORS[Math.floor(Math.random() * FOOD_COLORS.length)];
+}
+
 const roomChannelName = `arena_ves_${selectedEntryFee}`;
 
 let socket = null;
@@ -228,8 +235,8 @@ async function verificarYCargarComida() {
         x: Math.random() * (WORLD_SIZE - 200) + 100,
         y: Math.random() * (WORLD_SIZE - 200) + 100,
         ves: valorComidaConfig,
-        radius: 5,
-        color: valorComidaConfig > 50 ? '#4ade80' : '#38bdf8'
+        radius: FOOD_RADIUS,
+        color: getRandomFoodColor()
       });
     }
   } else {
@@ -250,7 +257,7 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
           targetX: payload.x,
           targetY: payload.y,
           targetAngle: payload.angle,
-          currentSpeed: payload.speed || 3.5,
+          currentSpeed: payload.speed || 2.6,
           targetBody: payload.body
         };
       } else {
@@ -258,7 +265,7 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
         p.targetX = payload.x;
         p.targetY = payload.y;
         p.targetAngle = payload.angle;
-        p.currentSpeed = payload.speed || 3.5;
+        p.currentSpeed = payload.speed || 2.6;
         p.ves = payload.ves;
         p.skinId = payload.skinId;
         p.color = payload.color;
@@ -301,7 +308,7 @@ let player = {
   x: WORLD_SIZE / 2 + (Math.random() - 0.5) * 500,
   y: WORLD_SIZE / 2 + (Math.random() - 0.5) * 500,
   angle: 0,
-  speed: 3.5,
+  speed: 2.6,
   radius: 12,
   body: [],
   length: 20,
@@ -317,20 +324,41 @@ if (!isSpectator) {
   }
 }
 
-function dropLootOnDeath(x, y, totalVes) {
+function dropLootOnDeath(x, y, totalVes, bodySegments = []) {
   if (isSpectator) return;
-  const drops = 12;
-  const valuePerDrop = Math.floor(totalVes / drops);
+
+  const validBody = Array.isArray(bodySegments) && bodySegments.length > 0
+    ? bodySegments
+    : [{ x, y }];
+
+  // Bastantes bolitas a lo largo del cuerpo (entre 35 y 60 según el tamaño del cuerpo)
+  const drops = Math.min(60, Math.max(35, validBody.length * 2));
+  const valuePerDrop = totalVes > 0 ? Math.max(0.5, Number((totalVes / drops).toFixed(2))) : 1;
 
   for (let i = 0; i < drops; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = Math.random() * 50;
+    // Posición proporcional a lo largo del arreglo del cuerpo (0 = cabeza, final = cola)
+    const progress = drops > 1 ? i / (drops - 1) : 0;
+    const exactIndex = progress * (validBody.length - 1);
+    const idxA = Math.floor(exactIndex);
+    const idxB = Math.min(validBody.length - 1, idxA + 1);
+    const t = exactIndex - idxA;
+
+    const segA = validBody[idxA] || { x, y };
+    const segB = validBody[idxB] || segA;
+
+    const baseX = segA.x + (segB.x - segA.x) * t;
+    const baseY = segA.y + (segB.y - segA.y) * t;
+
+    // Pequeña dispersión natural alrededor del rastro del cuerpo
+    const jitterAngle = Math.random() * Math.PI * 2;
+    const jitterDist = Math.random() * 8;
+
     const lootItem = {
-      x: x + Math.cos(angle) * dist,
-      y: y + Math.sin(angle) * dist,
+      x: baseX + Math.cos(jitterAngle) * jitterDist,
+      y: baseY + Math.sin(jitterAngle) * jitterDist,
       ves: valuePerDrop,
-      radius: Math.max(5, Math.min(12, Math.sqrt(valuePerDrop) * 1.2)),
-      color: valuePerDrop > 200 ? '#4ade80' : '#38bdf8'
+      radius: Math.max(5.5, Math.min(11, 5.5 + Math.sqrt(valuePerDrop) * 0.7)),
+      color: getRandomFoodColor()
     };
 
     sharedLootOrbs.push(lootItem);
@@ -356,7 +384,7 @@ function updateLocalPlayer() {
   let currentSpeed = player.speed;
 
   if (isBoosting && player.ves > (selectedEntryFee * 0.1)) {
-    currentSpeed = 6.0;
+    currentSpeed = 4.6;
     player.ves -= (selectedEntryFee * 0.0005);
   }
 
@@ -399,6 +427,8 @@ function updateLocalPlayer() {
           food.x = Math.random() * (mapSizeSafe - 200) + 100;
           food.y = Math.random() * (mapSizeSafe - 200) + 100;
           food.ves = valorComidaConfig;
+          food.radius = FOOD_RADIUS;
+          food.color = getRandomFoodColor();
         }
       }
     }
@@ -406,10 +436,11 @@ function updateLocalPlayer() {
 
   for (let i = sharedLootOrbs.length - 1; i >= 0; i--) {
     const orb = sharedLootOrbs[i];
+    const orbRadius = orb.radius || 7;
     const dx = player.x - orb.x;
     const dy = player.y - orb.y;
-    if (Math.abs(dx) < 30 && Math.abs(dy) < 30) {
-      if (Math.hypot(dx, dy) < player.radius + orb.radius + 8) {
+    if (Math.abs(dx) < 35 && Math.abs(dy) < 35) {
+      if (Math.hypot(dx, dy) < player.radius + orbRadius + 8) {
         player.ves += orb.ves; 
         sharedLootOrbs.splice(i, 1);
 
@@ -426,7 +457,6 @@ function updateLocalPlayer() {
 
   if (gameRoom && gameActive) {
     const now = Date.now();
-    // Enviamos posición cada 50ms (20 veces/seg) para eliminar saltos visuales
     if (now - lastSendTime > 50) {
       lastSendTime = now;
       gameRoom.send({
@@ -450,9 +480,6 @@ function updateLocalPlayer() {
 }
 
 // ==========================================
-// 4. RENDERIZADO Y LÍNEA DELIMITADORA
-// ==========================================
-// ==========================================
 // 4. RENDERIZADO Y LÍNEA CONTINUA (FLUIDO / TIPO SEDA)
 // ==========================================
 function drawPlayer(p, camera, isLocal) {
@@ -467,7 +494,7 @@ function drawPlayer(p, camera, isLocal) {
           p.x = p.targetX;
           p.y = p.targetY;
         } else {
-          const spd = p.currentSpeed || 3.5;
+          const spd = p.currentSpeed || 2.6;
           if (p.targetAngle !== undefined) {
             p.x += Math.cos(p.targetAngle) * spd;
             p.y += Math.sin(p.targetAngle) * spd;
@@ -503,12 +530,11 @@ function drawPlayer(p, camera, isLocal) {
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  const wormRadius = Math.max(8, 12 * Math.min(1.5, 1 + Math.sqrt(p.ves || 0) * 0.05));
+  const wormRadius = Math.max(5.5, 9 * Math.min(1.35, 1 + Math.sqrt(p.ves || 0) * 0.04));
   ctx.lineWidth = wormRadius * 2;
 
-  // Color o Skin del gusano
   if (p.skinId === 've') {
-    ctx.strokeStyle = '#ffcc00'; // Color base tricolor
+    ctx.strokeStyle = '#ffcc00';
   } else if (p.skinId === 'fuego') {
     ctx.strokeStyle = '#f97316';
   } else if (p.skinId === 'galaxia') {
@@ -539,7 +565,6 @@ function drawPlayer(p, camera, isLocal) {
   }
   ctx.restore();
 
-  // Nombre y puntaje sobre la cabeza
   const headX = p.x - camera.x;
   const headY = p.y - camera.y;
 
@@ -550,6 +575,7 @@ function drawPlayer(p, camera, isLocal) {
     ctx.fillText(`${p.name} (${Math.floor(p.ves)} VES)`, headX, headY - (wormRadius + 8));
   }
 }
+
 // ==========================================
 // FUNCIÓN: TABLA DE POSICIONES (LEADERBOARD)
 // ==========================================
@@ -620,7 +646,7 @@ function checkRealPlayerCollisions() {
     for (let seg of friend.body) {
       if (Math.hypot(player.x - seg.x, player.y - seg.y) < player.radius + 6) {
         player.alive = false;
-        dropLootOnDeath(player.x, player.y, player.ves);
+        dropLootOnDeath(player.x, player.y, player.ves, player.body);
 
         if (gameRoom) {
           gameRoom.send({ type: 'broadcast', event: 'player_died', payload: { id: player.id } });
@@ -763,21 +789,26 @@ function gameLoop(timestamp) {
           const sy = food.y - camera.y;
           if (sx >= -20 && sx <= canvas.width + 20 && sy >= -20 && sy <= canvas.height + 20) {
             ctx.beginPath();
-            ctx.arc(sx, sy, food.radius, 0, Math.PI * 2);
-            ctx.fillStyle = food.color;
+            ctx.arc(sx, sy, food.radius || FOOD_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = food.color || '#38bdf8';
             ctx.fill();
           }
         });
       }
 
+      // Dibujar botín soltado al morir con borde visible
       sharedLootOrbs.forEach(orb => {
         const sx = orb.x - camera.x;
         const sy = orb.y - camera.y;
-        if (sx >= -20 && sx <= canvas.width + 20 && sy >= -20 && sy <= canvas.height + 20) {
+        const r = orb.radius || 7;
+        if (sx >= -30 && sx <= canvas.width + 30 && sy >= -30 && sy <= canvas.height + 30) {
           ctx.beginPath();
-          ctx.arc(sx, sy, orb.radius, 0, Math.PI * 2);
-          ctx.fillStyle = orb.color;
+          ctx.arc(sx, sy, r, 0, Math.PI * 2);
+          ctx.fillStyle = orb.color || '#facc15';
           ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#ffffff';
+          ctx.stroke();
         }
       });
 
