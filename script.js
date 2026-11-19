@@ -39,6 +39,32 @@ function saveSecureBalance(amount) {
 // ==========================================
 let WORLD_SIZE = 2500;
 
+function getCenterSpawnPos(spread = 120) {
+  const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
+  const center = mapSizeSafe / 2;
+  return {
+    x: center + (Math.random() - 0.5) * spread,
+    y: center + (Math.random() - 0.5) * spread
+  };
+}
+
+function resetPlayerToCenter() {
+  const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
+  freeCamPos.x = mapSizeSafe / 2;
+  freeCamPos.y = mapSizeSafe / 2;
+
+  if (!isSpectator && typeof player !== 'undefined') {
+    const spawn = getCenterSpawnPos(120);
+    player.x = spawn.x;
+    player.y = spawn.y;
+    player.body = [];
+    const segCount = Math.max(5, player.length || 20);
+    for (let i = 0; i < segCount; i++) {
+      player.body.push({ x: player.x, y: player.y });
+    }
+  }
+}
+
 async function cargarTamanoMapaGlobal() {
   if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
 
@@ -49,8 +75,9 @@ async function cargarTamanoMapaGlobal() {
     .single();
 
   if (data && data.map_size) {
-    WORLD_SIZE = data.map_size;
+    WORLD_SIZE = Number(data.map_size) || 2500;
     console.log(`🗺️ Tamaño de mapa global cargado desde Supabase: ${WORLD_SIZE}x${WORLD_SIZE}`);
+    resetPlayerToCenter();
   }
 }
 
@@ -302,11 +329,13 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
 // ==========================================
 // 3. JUGADOR LOCAL Y BUCLE DE JUEGO
 // ==========================================
+const initialSpawn = getCenterSpawnPos(120);
+
 let player = {
   id: myPlayerId,
   name: playerName,
-  x: WORLD_SIZE / 2 + (Math.random() - 0.5) * 500,
-  y: WORLD_SIZE / 2 + (Math.random() - 0.5) * 500,
+  x: initialSpawn.x,
+  y: initialSpawn.y,
   angle: 0,
   speed: 2.6,
   radius: 12,
@@ -331,12 +360,10 @@ function dropLootOnDeath(x, y, totalVes, bodySegments = []) {
     ? bodySegments
     : [{ x, y }];
 
-  // Bastantes bolitas a lo largo del cuerpo (entre 35 y 60 según el tamaño del cuerpo)
   const drops = Math.min(60, Math.max(35, validBody.length * 2));
   const valuePerDrop = totalVes > 0 ? Math.max(0.5, Number((totalVes / drops).toFixed(2))) : 1;
 
   for (let i = 0; i < drops; i++) {
-    // Posición proporcional a lo largo del arreglo del cuerpo (0 = cabeza, final = cola)
     const progress = drops > 1 ? i / (drops - 1) : 0;
     const exactIndex = progress * (validBody.length - 1);
     const idxA = Math.floor(exactIndex);
@@ -349,7 +376,6 @@ function dropLootOnDeath(x, y, totalVes, bodySegments = []) {
     const baseX = segA.x + (segB.x - segA.x) * t;
     const baseY = segA.y + (segB.y - segA.y) * t;
 
-    // Pequeña dispersión natural alrededor del rastro del cuerpo
     const jitterAngle = Math.random() * Math.PI * 2;
     const jitterDist = Math.random() * 8;
 
@@ -406,8 +432,14 @@ function updateLocalPlayer() {
   player.y += Math.sin(player.angle) * currentSpeed;
 
   const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
-  player.x = Math.max(30, Math.min(mapSizeSafe - 30, player.x));
-  player.y = Math.max(30, Math.min(mapSizeSafe - 30, player.y));
+  if (currentPhase === 'PREPARATION') {
+    const margin = player.radius + 10;
+    player.x = Math.max(margin, Math.min(mapSizeSafe - margin, player.x));
+    player.y = Math.max(margin, Math.min(mapSizeSafe - margin, player.y));
+  } else if (!player.alive) {
+    player.x = Math.max(0, Math.min(mapSizeSafe, player.x));
+    player.y = Math.max(0, Math.min(mapSizeSafe, player.y));
+  }
 
   player.body.unshift({ x: player.x, y: player.y });
   while (player.body.length > player.length) {
@@ -526,7 +558,6 @@ function drawPlayer(p, camera, isLocal) {
 
   if (!p.body || p.body.length < 2) return;
 
-  // --- DIBUJAR CUERPO CONTINUO (FRANJA CORRIDA / TIPO SEDA) ---
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -658,6 +689,31 @@ function checkRealPlayerCollisions() {
   });
 }
 
+function checkWallCollisions() {
+  if (isSpectator || currentPhase !== 'COMBAT' || !player.alive) return;
+
+  const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
+  const hitLeft = player.x - player.radius <= 0;
+  const hitRight = player.x + player.radius >= mapSizeSafe;
+  const hitTop = player.y - player.radius <= 0;
+  const hitBottom = player.y + player.radius >= mapSizeSafe;
+
+  if (hitLeft || hitRight || hitTop || hitBottom) {
+    player.alive = false;
+    dropLootOnDeath(player.x, player.y, player.ves, player.body);
+
+    if (gameRoom) {
+      gameRoom.send({
+        type: 'broadcast',
+        event: 'player_died',
+        payload: { id: player.id }
+      });
+    }
+
+    endGame(false, '¡Chocaste contra la línea roja del límite del mapa! Has quedado eliminado.');
+  }
+}
+
 function updateHUD(observedPlayer) {
   const vesDisplay = document.getElementById('ves-display');
   const aliveDisplay = document.getElementById('alive-display');
@@ -737,6 +793,7 @@ function gameLoop(timestamp) {
         updateLocalPlayer();
       }
       checkRealPlayerCollisions();
+      checkWallCollisions();
 
       const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
       let camera = { x: 0, y: 0 };
@@ -775,11 +832,11 @@ function gameLoop(timestamp) {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
       }
 
-      // Línea azul delimitadora del mapa
+      // Línea delimitadora del mapa (azul en preparación, roja al iniciar combate)
       const mapScreenX = 0 - camera.x;
       const mapScreenY = 0 - camera.y;
 
-      ctx.strokeStyle = '#38bdf8';
+      ctx.strokeStyle = currentPhase === 'COMBAT' ? '#ef4444' : '#38bdf8';
       ctx.lineWidth = 6;
       ctx.strokeRect(mapScreenX, mapScreenY, mapSizeSafe, mapSizeSafe);
 
