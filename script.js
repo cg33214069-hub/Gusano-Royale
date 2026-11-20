@@ -1,3 +1,12 @@
+// 🚨 BLOQUEO DE EMERGENCIA DE SALAS (MANTENIMIENTO)
+const SALAS_EN_MANTENIMIENTO = true; // Cambia a false para volver a abrir
+
+if (SALAS_EN_MANTENIMIENTO && !window.isSpectatorMode) {
+  alert('⚠️ Salas en mantenimiento por actualización rápida. Vuelve en unos minutos.');
+  window.location.href = 'index.html'; // Cambia por el nombre de tu lobby si es distinto
+  throw new Error('Salas bloqueadas por mantenimiento');
+}
+
 // ==========================================
 // DETECCIÓN DE MODO ESPECTADOR (ADMIN)
 // ==========================================
