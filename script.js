@@ -1,4 +1,3 @@
-
 // ==========================================
 // DETECCIÓN DE MODO ESPECTADOR (ADMIN)
 // ==========================================
@@ -83,7 +82,6 @@ async function cargarTamanoMapaGlobal() {
   }
 }
 
-cargarTamanoMapaGlobal();
 const PREPARATION_TIME = 10; 
 const COMBAT_TIME = 60;      
 
@@ -111,7 +109,7 @@ let selectedEntryFee = isSpectator
 let selectedSkin = localStorage.getItem('selected_skin') || 've';
 let selectedColor = localStorage.getItem('worm_color') || '#22c55e';
 let playerName = localStorage.getItem('player_name') || 'Jugador';
-let gameActive = true;
+let gameActive = false;
 let currentPhase = 'PREPARATION';
 let timeLeft = PREPARATION_TIME;
 let timerInterval = null;
@@ -133,14 +131,18 @@ window.addEventListener('click', (e) => {
 // ==========================================
 // DESCUENTO AUTOMÁTICO Y SEGURO DE LA ENTRADA EN SUPABASE
 // ==========================================
+let yaDescontoEntrada = false;
+
 async function descontarEntradaEnSupabase() {
-  if (isSpectator) return;
+  if (isSpectator || yaDescontoEntrada) return;
   if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
 
   const userId = localStorage.getItem('user_id');
   const userEmail = localStorage.getItem('user_email');
 
   if (!userId && !userEmail) return;
+
+  yaDescontoEntrada = true;
 
   let query = supabaseClient.from('profiles').select('id, balance');
   if (userId) {
@@ -150,18 +152,30 @@ async function descontarEntradaEnSupabase() {
   }
 
   const { data: profile, error } = await query.maybeSingle();
-  if (error || !profile) return;
+  if (error || !profile) {
+    yaDescontoEntrada = false;
+    return;
+  }
 
   const saldoActual = Number(profile.balance || 0);
   if (saldoActual >= selectedEntryFee) {
     const nuevoSaldo = saldoActual - selectedEntryFee;
-    
-    await supabaseClient
+
+    const { error: errUpdate } = await supabaseClient
       .from('profiles')
       .update({ balance: nuevoSaldo })
       .eq('id', profile.id);
 
+    if (errUpdate) {
+      console.error('❌ Error al descontar entrada en Supabase:', errUpdate.message);
+      yaDescontoEntrada = false;
+      return;
+    }
+
     saveSecureBalance(nuevoSaldo);
+    console.log(`✅ Entrada de ${selectedEntryFee} VES descontada una sola vez. Nuevo saldo: ${nuevoSaldo}`);
+  } else {
+    console.warn('⚠️ Saldo insuficiente para descontar la entrada.');
   }
 }
 
@@ -340,7 +354,6 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
   gameRoom.subscribe((status) => {
     if (status === 'SUBSCRIBED') {
       console.log(`¡Conectado a la sala aislada [${roomChannelName}]${isSpectator ? ' (MODO ESPECTADOR)' : ''}!`);
-      verificarYCargarComida();
     }
   });
 }
@@ -906,12 +919,150 @@ function gameLoop(timestamp) {
   }
 }
 
-gameActive = true;
-const skinBtnInit = document.getElementById('skin-btn');
-if (skinBtnInit && !isSpectator) skinBtnInit.style.display = 'block';
+// ==========================================
+// PANTALLA DE CARGA REUTILIZABLE (ENTRADA Y SALIDA AL MENÚ)
+// ==========================================
+function mostrarPantallaCargaSala(titulo = 'Preparando Arena', subtitulo = 'Verificando saldo y conectando con la sala...') {
+  const existing = document.getElementById('arena-loading-overlay');
+  if (existing) existing.remove();
 
-startTimer();
-requestAnimationFrame(gameLoop);
+  const overlay = document.createElement('div');
+  overlay.id = 'arena-loading-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    font-family: sans-serif;
+    color: #f8fafc;
+    padding: 20px;
+    text-align: center;
+  `;
+
+  overlay.innerHTML = `
+    <h2 id="loading-title-text" style="margin: 0 0 8px; color: #38bdf8; font-size: 22px; letter-spacing: 0.5px;">
+      ${titulo}
+    </h2>
+    <p id="loading-status-text" style="margin: 0 0 18px; color: #94a3b8; font-size: 14px;">
+      ${subtitulo}
+    </p>
+    <div style="width: 100%; max-width: 340px; height: 14px; background: #1e293b; border-radius: 999px; overflow: hidden; border: 1px solid #334155;">
+      <div id="loading-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #22c55e, #38bdf8); transition: width 0.25s ease;"></div>
+    </div>
+    <span id="loading-percent-text" style="margin-top: 10px; font-size: 13px; font-weight: bold; color: #4ade80;">0%</span>
+  `;
+
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function actualizarProgresoCarga(porcentaje, mensaje) {
+  const bar = document.getElementById('loading-progress-bar');
+  const statusText = document.getElementById('loading-status-text');
+  const percentText = document.getElementById('loading-percent-text');
+  if (bar) bar.style.width = `${porcentaje}%`;
+  if (percentText) percentText.innerText = `${porcentaje}%`;
+  if (statusText && mensaje) statusText.innerText = mensaje;
+}
+
+let promesaGuardadoFinal = Promise.resolve();
+
+async function salirAlMenuConCarga(urlDestino = 'dashboard.html') {
+  mostrarPantallaCargaSala(
+    'Guardando Progreso',
+    'Sincronizando tu saldo con el dashboard...'
+  );
+
+  actualizarProgresoCarga(20, 'Confirmando actualización de saldo en Supabase...');
+  try {
+    await promesaGuardadoFinal;
+  } catch (e) {
+    console.warn('Aviso al esperar guardado:', e);
+  }
+
+  actualizarProgresoCarga(55, 'Cerrando conexión con la sala...');
+  if (gameRoom && typeof supabaseClient !== 'undefined' && supabaseClient) {
+    try {
+      await supabaseClient.removeChannel(gameRoom);
+    } catch (e) {}
+  }
+
+  if (socket) {
+    try {
+      socket.disconnect();
+    } catch (e) {}
+  }
+
+  await new Promise(resolve => setTimeout(resolve, 500));
+  actualizarProgresoCarga(85, 'Actualizando datos del dashboard...');
+  await new Promise(resolve => setTimeout(resolve, 500));
+  actualizarProgresoCarga(100, '¡Listo! Volviendo al dashboard...');
+
+  await new Promise(resolve => setTimeout(resolve, 250));
+  window.location.href = urlDestino;
+}
+window.salirAlMenuConCarga = salirAlMenuConCarga;
+
+function activarBarraSalidaEnModalFin() {
+  const endModal = document.getElementById('end-modal');
+  if (!endModal) return;
+
+  const botonesSalida = endModal.querySelectorAll('a, button');
+  botonesSalida.forEach(btn => {
+    if (btn.dataset.cargaSalidaActiva) return;
+    btn.dataset.cargaSalidaActiva = 'true';
+
+    btn.addEventListener('click', (e) => {
+      const href = btn.getAttribute('href');
+      const destino = (href && href !== '#' && href !== 'index.html' && !href.startsWith('javascript:'))
+        ? href
+        : 'dashboard.html';
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      salirAlMenuConCarga(destino);
+    }, true);
+  });
+}
+
+async function iniciarSalaConCarga() {
+  gameActive = false;
+
+  const overlay = mostrarPantallaCargaSala(
+    `Preparando Arena (${selectedEntryFee} VES)`,
+    'Verificando saldo y conectando con la sala...'
+  );
+
+  actualizarProgresoCarga(15, 'Descontando entrada y verificando saldo...');
+  await descontarEntradaEnSupabase();
+
+  actualizarProgresoCarga(50, 'Cargando mapa y configuración global...');
+  await cargarTamanoMapaGlobal();
+
+  actualizarProgresoCarga(75, 'Sincronizando comida y sala...');
+  await verificarYCargarComida();
+
+  await new Promise(resolve => setTimeout(resolve, 600));
+  actualizarProgresoCarga(90, '¡Casi listo! Entrando a la arena...');
+  await new Promise(resolve => setTimeout(resolve, 600));
+  actualizarProgresoCarga(100, '¡A jugar!');
+
+  await new Promise(resolve => setTimeout(resolve, 250));
+  overlay.remove();
+
+  gameActive = true;
+  const skinBtnInit = document.getElementById('skin-btn');
+  if (skinBtnInit && !isSpectator) skinBtnInit.style.display = 'block';
+
+  activarBarraSalidaEnModalFin();
+  startTimer();
+  requestAnimationFrame(gameLoop);
+}
+
+iniciarSalaConCarga();
 
 // ==========================================
 // FUNCIÓN ENDGAME OPTIMIZADA PARA GUARDAR EL PREMIO
@@ -928,48 +1079,9 @@ async function endGame(survived, reason) {
   const endVes = document.getElementById('end-ves-amount');
 
   if (endModal) endModal.style.display = 'flex';
+  activarBarraSalidaEnModalFin();
 
   const finalAmount = survived ? Math.floor(player.ves) : 0;
-
-  if (survived && finalAmount > 0) {
-    let savedBalance = getSecureBalance();
-    savedBalance += finalAmount;
-    saveSecureBalance(savedBalance);
-
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      const userId = localStorage.getItem('user_id');
-      const userEmail = localStorage.getItem('user_email');
-
-      if (userId || userEmail) {
-        let query = supabaseClient.from('profiles').select('id, balance');
-        if (userId) {
-          query = query.eq('id', userId);
-        } else {
-          query = query.eq('email', userEmail);
-        }
-
-        const { data: profile, error: errFetch } = await query.maybeSingle();
-
-        if (!errFetch && profile) {
-          const balanceActualServidor = Number(profile.balance || 0);
-          const nuevoBalanceServidor = balanceActualServidor + finalAmount;
-
-          const { error: errUpdate } = await supabaseClient
-            .from('profiles')
-            .update({ balance: nuevoBalanceServidor })
-            .eq('id', profile.id);
-
-          if (errUpdate) {
-            console.error("❌ Error de Supabase al sumar la ganancia:", errUpdate.message);
-          } else {
-            console.log("✅ ¡Ganancia de", finalAmount, "VES sumada con éxito en Supabase!");
-          }
-        } else {
-          console.error("❌ No se pudo encontrar el perfil en Supabase para actualizar el premio.");
-        }
-      }
-    }
-  }
 
   if (survived) {
     if (endTitle) { endTitle.innerText = "¡VICTORIA REAL!"; endTitle.style.color = "#4ade80"; }
@@ -979,5 +1091,48 @@ async function endGame(survived, reason) {
     if (endTitle) { endTitle.innerText = "ELIMINADO"; endTitle.style.color = "#ef4444"; }
     if (endDesc) endDesc.innerText = reason;
     if (endVes) endVes.innerText = "0 VES";
+  }
+
+  if (survived && finalAmount > 0) {
+    let savedBalance = getSecureBalance();
+    savedBalance += finalAmount;
+    saveSecureBalance(savedBalance);
+
+    promesaGuardadoFinal = (async () => {
+      if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+
+      const userId = localStorage.getItem('user_id');
+      const userEmail = localStorage.getItem('user_email');
+      if (!userId && !userEmail) return;
+
+      let query = supabaseClient.from('profiles').select('id, balance');
+      if (userId) {
+        query = query.eq('id', userId);
+      } else {
+        query = query.eq('email', userEmail);
+      }
+
+      const { data: profile, error: errFetch } = await query.maybeSingle();
+
+      if (!errFetch && profile) {
+        const balanceActualServidor = Number(profile.balance || 0);
+        const nuevoBalanceServidor = balanceActualServidor + finalAmount;
+
+        const { error: errUpdate } = await supabaseClient
+          .from('profiles')
+          .update({ balance: nuevoBalanceServidor })
+          .eq('id', profile.id);
+
+        if (errUpdate) {
+          console.error("❌ Error de Supabase al sumar la ganancia:", errUpdate.message);
+        } else {
+          console.log("✅ ¡Ganancia de", finalAmount, "VES sumada con éxito en Supabase!");
+        }
+      } else {
+        console.error("❌ No se pudo encontrar el perfil en Supabase para actualizar el premio.");
+      }
+    })();
+
+    await promesaGuardadoFinal;
   }
 }

@@ -861,23 +861,8 @@ document.addEventListener('contextmenu', function(e) {
         return;
       }
 
-      const nuevoSaldo = saldoActual - costoEntrada;
-
-      const { error: updateErr } = await supabaseClient
-        .from('profiles')
-        .update({ balance: nuevoSaldo })
-        .eq('id', profile.id);
-
-      if (updateErr) {
-        alert("Error al descontar la entrada: " + updateErr.message);
-        return;
-      }
-
-      localStorage.setItem('user_balance', nuevoSaldo);
       localStorage.setItem('selected_room', salaId);
       localStorage.setItem('selected_entry', costoEntrada);
-
-      alert(`✅ ¡Entrada pagada con éxito!\n\nSe te han descontado ${costoEntrada.toLocaleString('es-VE')} VES de tu saldo.`);
       window.location.href = 'game.html';
     }
 
