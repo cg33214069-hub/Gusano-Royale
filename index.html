@@ -58,6 +58,11 @@
       color: white;
       font-size: 0.95rem;
     }
+    #referral-code-input {
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-color: rgba(56, 189, 248, 0.45);
+    }
     .btn-auth {
       width: 100%;
       padding: 12px;
@@ -145,6 +150,11 @@
           <label for="phone-input">Número de Teléfono / Celular</label>
           <input type="text" id="phone-input" placeholder="Ej. +584121234567">
         </div>
+
+        <div class="input-group">
+          <label for="referral-code-input">Código Promocional (Obligatorio)</label>
+          <input type="text" id="referral-code-input" placeholder="Ej. GR-A8K29P" maxlength="20" required>
+        </div>
       </div>
 
       <!-- CAMPOS COMUNES -->
@@ -195,10 +205,10 @@
     // ==========================================
     // NOTIFICACIÓN PUSH INSTANTÁNEA VÍA NTFY.SH
     // ==========================================
-    async function notificarRegistroNtfy(fullname, username, phone, email) {
+    async function notificarRegistroNtfy(fullname, username, phone, email, referralCodeUsed) {
       const CANAL_SECRETO = 'gusanoroyal2026';
 
-      const mensaje = `Nombre: ${fullname}\nApodo: ${username}\nTelefono: ${phone}\nCorreo: ${email}\nHora: ${new Date().toLocaleString('es-VE')}`;
+      const mensaje = `Nombre: ${fullname}\nApodo: ${username}\nTelefono: ${phone}\nCorreo: ${email}\nCodigo Promo: ${referralCodeUsed}\nHora: ${new Date().toLocaleString('es-VE')}`;
 
       try {
         await fetch(`https://ntfy.sh/${CANAL_SECRETO}`, {
@@ -228,7 +238,48 @@
       console.error("Error al inicializar Supabase:", e);
     }
 
-    
+    // Configuración de tokens por cada referido registrado con éxito
+    const TOKENS_POR_REFERIDO = 100;
+
+    function generarCodigoReferidoPropio() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return `GR-${code}`;
+    }
+
+    async function validarCodigoPromocional(codigoRaw) {
+      const codigoLimpio = (codigoRaw || '').trim().toUpperCase();
+
+      if (!codigoLimpio) {
+        return {
+          ok: false,
+          mensaje: "❌ El código promocional es obligatorio para registrarte."
+        };
+      }
+
+      const { data: referente, error } = await supabaseClient
+        .from('profiles')
+        .select('id, referral_code, referral_tokens')
+        .eq('referral_code', codigoLimpio)
+        .maybeSingle();
+
+      if (error || !referente) {
+        return {
+          ok: false,
+          mensaje: "❌ El código promocional ingresado no existe o no es válido."
+        };
+      }
+
+      return {
+        ok: true,
+        codigo: codigoLimpio,
+        referente
+      };
+    }
+
     let isRegistering = false;
 
     function toggleMode() {
@@ -268,10 +319,17 @@
           const fullname = document.getElementById('fullname-input').value.trim();
           const username = document.getElementById('username-input').value.trim();
           const phone = document.getElementById('phone-input').value.trim();
+          const referralInput = document.getElementById('referral-code-input').value.trim().toUpperCase();
           const confirmPassword = document.getElementById('confirm-password-input').value.trim();
 
           if (!fullname || !username || !phone) {
             alert("Por favor completa todos tus datos personales.");
+            authBtn.disabled = false;
+            authBtn.innerText = "Registrarse";
+            return;
+          }
+          if (!referralInput) {
+            alert("⚠️ Debes ingresar un código promocional obligatorio para crear tu cuenta.");
             authBtn.disabled = false;
             authBtn.innerText = "Registrarse";
             return;
@@ -295,10 +353,21 @@
             return;
           }
 
+          // Validar código promocional obligatorio antes de crear la cuenta
+          const validacionPromo = await validarCodigoPromocional(referralInput);
+          if (!validacionPromo.ok) {
+            alert(validacionPromo.mensaje);
+            authBtn.disabled = false;
+            authBtn.innerText = "Registrarse";
+            return;
+          }
+
           const { data, error } = await supabaseClient.auth.signUp({ email, password });
           if (error) throw error;
 
           if (data.user) {
+            const nuevoCodigoPropio = generarCodigoReferidoPropio();
+
             const { error: profileError } = await supabaseClient.from('profiles').insert([
               { 
                 id: data.user.id, 
@@ -306,7 +375,10 @@
                 username: username, 
                 phone: phone,
                 email: email,
-                balance: 0 
+                balance: 0,
+                referral_code: nuevoCodigoPropio,
+                referral_tokens: 0,
+                referred_by: validacionPromo.codigo
               }
             ]);
             
@@ -314,10 +386,26 @@
               console.error("Error al crear perfil:", profileError);
               throw profileError;
             }
+
+            // Registrar referido y sumar tokens mediante función SQL segura en Supabase
+            if (validacionPromo.referente.id !== data.user.id) {
+              const { data: refResult, error: refRpcError } = await supabaseClient.rpc(
+                'registrar_referido_y_sumar_tokens',
+                {
+                  p_referred_id: data.user.id,
+                  p_codigo_promo: validacionPromo.codigo,
+                  p_tokens_premio: TOKENS_POR_REFERIDO
+                }
+              );
+
+              if (refRpcError || !refResult?.ok) {
+                console.error("Error registrando referido en RPC:", refRpcError || refResult?.error);
+              }
+            }
           }
 
           // ENVIAR NOTIFICACIÓN AL TELÉFONO ANTES DE MOSTRAR EL MENSAJE DE ÉXITO
-          await notificarRegistroNtfy(fullname, username, phone, email);
+          await notificarRegistroNtfy(fullname, username, phone, email, validacionPromo.codigo);
 
           alert("¡Registro exitoso! Ya puedes iniciar sesión con tus datos.");
           toggleMode();
@@ -326,7 +414,6 @@
           const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
           if (error) throw error;
 
-  
           alert("¡Bienvenido de vuelta!");
           
           const userNick = email.split('@')[0];

@@ -228,98 +228,7 @@
       color: #94a3b8;
     }
 
-    /* MÓDULO DE PERSONALIZACIÓN DE SKINS */
-    .skins-card {
-      background: #0b0f19;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 20px;
-    }
-
-    .skins-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 14px;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .skins-title {
-      font-size: 1rem;
-      font-weight: 700;
-      color: #ffffff;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .active-skin-badge {
-      background: rgba(34, 197, 94, 0.15);
-      border: 1px solid #22c55e;
-      color: #4ade80;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 0.75rem;
-      font-weight: bold;
-    }
-
-    .skins-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-      gap: 12px;
-      max-height: 220px;
-      overflow-y: auto;
-      padding-right: 6px;
-    }
-
-    .skins-grid::-webkit-scrollbar {
-      width: 6px;
-    }
-    .skins-grid::-webkit-scrollbar-thumb {
-      background: #1e293b;
-      border-radius: 4px;
-    }
-
-    .skin-item {
-      background: #0f172a;
-      border: 2px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 10px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
-      position: relative;
-    }
-
-    .skin-item:hover {
-      border-color: #38bdf8;
-      transform: translateY(-2px);
-    }
-
-    .skin-item.selected {
-      border-color: #22c55e;
-      background: rgba(34, 197, 94, 0.08);
-    }
-
-    .skin-preview {
-      width: 100%;
-      height: 36px;
-      border-radius: 20px;
-      margin-bottom: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-
-    .skin-name {
-      font-size: 0.75rem;
-      font-weight: bold;
-      color: #cbd5e1;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* MÓDULOS DE DEPÓSITOS Y RETIROS */
+    /* MÓDULO DE DEPÓSITOS Y RETIROS */
     .deposit-card {
       background: #0b0f19;
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -536,6 +445,76 @@
     .medium .btn-play-room { background: #9333ea; }
     .pro .btn-play-room { background: #ca8a04; }
     .vip .btn-play-room { background: #dc2626; }
+
+    /* PANEL DE REFERIDOS Y TOKENS EN PERFIL */
+    .referral-box {
+      background: #0f172a;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 24px;
+    }
+
+    .referral-stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      margin: 14px 0;
+    }
+
+    .referral-stat-chip {
+      background: #020617;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .referral-code-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      background: #020617;
+      border: 1px dashed rgba(56, 189, 248, 0.5);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+    }
+
+    .convert-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .convert-row input {
+      flex: 1;
+      min-width: 180px;
+      padding: 11px 14px;
+      background: #020617;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      color: #ffffff;
+      font-size: 0.95rem;
+    }
+
+    .btn-convert-tokens {
+      background: #22c55e;
+      color: #030712;
+      border: none;
+      padding: 11px 18px;
+      border-radius: 8px;
+      font-weight: 800;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .btn-convert-tokens:hover {
+      background: #16a34a;
+      color: #ffffff;
+    }
   </style>
 </head>
 <body>
@@ -589,24 +568,23 @@
           <div class="stat-value" id="stat-balance">100,00 VES</div>
           <div class="stat-sub">Disponible para tus partidas</div>
         </div>
-
-        
+      </div>
 
       <!-- TARJETA REDISEÑADA: SALA DE PRÁCTICA -->
-<div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 20px; margin-bottom: 25px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 15px; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);">
-  <div>
-    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
-      <span style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; font-size: 0.7rem; font-weight: 800; padding: 3px 10px; border-radius: 20px; text-transform: uppercase;">Modo Entrenamiento</span>
-      <span style="color: #94a3b8; font-size: 0.8rem;">• Bots Activos</span>
-    </div>
-    <h3 style="font-size: 1.3rem; color: #ffffff; margin-bottom: 4px;">Sala de Práctica (Gratis)</h3>
-    <p style="color: #94a3b8; font-size: 0.85rem;">Entra a entrenar contra bots y prueba tus skins sin arriesgar dinero real.</p>
-  </div>
+      <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 20px; margin-bottom: 25px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 15px; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);">
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+            <span style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; font-size: 0.7rem; font-weight: 800; padding: 3px 10px; border-radius: 20px; text-transform: uppercase;">Modo Entrenamiento</span>
+            <span style="color: #94a3b8; font-size: 0.8rem;">• Bots Activos</span>
+          </div>
+          <h3 style="font-size: 1.3rem; color: #ffffff; margin-bottom: 4px;">Sala de Práctica (Gratis)</h3>
+          <p style="color: #94a3b8; font-size: 0.85rem;">Entra a entrenar contra bots y prueba tus skins sin arriesgar dinero real.</p>
+        </div>
 
-  <button onclick="window.location.href='practice.html'" style="background: linear-gradient(90deg, #10b981 0%, #059669 100%); color: #ffffff; border: none; padding: 14px 28px; border-radius: 10px; font-weight: 800; font-size: 0.9rem; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); transition: transform 0.2s;">
-    🎮 JUGAR GRATIS
-  </button>
-</div>
+        <button onclick="window.location.href='practice.html'" style="background: linear-gradient(90deg, #10b981 0%, #059669 100%); color: #ffffff; border: none; padding: 14px 28px; border-radius: 10px; font-weight: 800; font-size: 0.9rem; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); transition: transform 0.2s;">
+          🎮 JUGAR GRATIS
+        </button>
+      </div>
 
       <h2 class="section-title">🔹 SALAS DISPONIBLES EN VIVO</h2>
       <div class="rooms-grid">
@@ -731,6 +709,43 @@
         <h2 class="deposit-title">👤 Perfil y Datos Bancarios</h2>
         <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px;" id="profile-email">Cargando datos de perfil...</p>
 
+        <!-- SECCIÓN DE REFERIDOS, TOKENS Y CONVERSIÓN A BOLÍVARES -->
+        <div class="referral-box">
+          <h3 style="font-size: 1rem; color: #38bdf8; margin-bottom: 6px;">🎁 Sistema de Referidos y Tokens</h3>
+          <p style="color: #94a3b8; font-size: 0.82rem; margin-bottom: 12px;">
+            Comparte tu código promocional. Cuando otros usuarios se registren con él, acumularás tokens que podrás cambiar por bolívares (<strong>1.000 tokens = 1.000 VES</strong>).
+          </p>
+
+          <div class="referral-code-bar">
+            <div>
+              <span style="font-size: 0.72rem; color: #94a3b8; display: block; text-transform: uppercase;">Tu código promocional</span>
+              <strong id="profile-referral-code" style="font-size: 1.05rem; color: #4ade80; letter-spacing: 1px;">CARGANDO...</strong>
+            </div>
+            <button type="button" class="btn-copiar" onclick="copiarCodigoPerfil(this)">📋 Copiar código</button>
+          </div>
+
+          <div class="referral-stats-row">
+            <div class="referral-stat-chip">
+              <span style="font-size: 0.72rem; color: #94a3b8; display: block; text-transform: uppercase;">Referidos registrados</span>
+              <strong id="profile-referral-count" style="font-size: 1.2rem; color: #ffffff;">0</strong>
+            </div>
+            <div class="referral-stat-chip">
+              <span style="font-size: 0.72rem; color: #94a3b8; display: block; text-transform: uppercase;">Tokens acumulados</span>
+              <strong id="profile-referral-tokens" style="font-size: 1.2rem; color: #facc15;">0</strong>
+            </div>
+            <div class="referral-stat-chip">
+              <span style="font-size: 0.72rem; color: #94a3b8; display: block; text-transform: uppercase;">Equivalente en VES</span>
+              <strong id="profile-tokens-ves" style="font-size: 1.2rem; color: #4ade80;">0,00 VES</strong>
+            </div>
+          </div>
+
+          <div class="convert-row">
+            <input type="number" id="convert-tokens-input" placeholder="Cantidad de tokens (mín. 1000)" min="1000" step="1">
+            <button type="button" class="btn-convert-tokens" onclick="convertirTokensAVes()">Cambiar a Bolívares</button>
+          </div>
+          <p id="referral-status-msg" style="margin-top: 10px; font-size: 0.82rem; color: #94a3b8; min-height: 18px;"></p>
+        </div>
+
         <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
           <div>
             <div style="font-weight: bold; color: #4ade80; font-size: 0.95rem; margin-bottom: 4px;">💬 Soporte y Asistencia por WhatsApp</div>
@@ -767,30 +782,193 @@
 
   <script>
     // --- ESCUDO ANTI-TRAMPAS PARA USUARIOS EN DASHBOARD ---
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'F12') {
-    e.preventDefault();
-    return false;
-  }
-  if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) {
-    e.preventDefault();
-    return false;
-  }
-  if (e.ctrlKey && e.key === 'u') {
-    e.preventDefault();
-    return false;
-  }
-});
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'F12') {
+        e.preventDefault();
+        return false;
+      }
+      if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) {
+        e.preventDefault();
+        return false;
+      }
+      if (e.ctrlKey && e.key === 'u') {
+        e.preventDefault();
+        return false;
+      }
+    });
 
-document.addEventListener('contextmenu', function(e) {
-  e.preventDefault();
-});
+    document.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+    });
 
     const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
     
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let selectedPaymentMethod = 'pago_movil';
+
+    // --- CONFIGURACIÓN DE TOKENS A BOLÍVARES (1.000 TOKENS = 1.000 VES) ---
+    const TASA_TOKEN_A_VES = 1;
+    const MINIMO_TOKENS_CANJE = 1000;
+
+    function generarCodigoReferidoDashboard() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return `GR-${code}`;
+    }
+
+    function copiarCodigoPerfil(boton) {
+      const codigoEl = document.getElementById('profile-referral-code');
+      const msgEl = document.getElementById('referral-status-msg');
+      if (!codigoEl) return;
+
+      const codigo = codigoEl.innerText.trim();
+      if (!codigo || codigo === 'CARGANDO...') return;
+
+      copiarAlPortapapeles(codigo, boton);
+      if (msgEl) {
+        msgEl.style.color = '#4ade80';
+        msgEl.innerText = `Código ${codigo} copiado. Compártelo para sumar tokens cuando se registren.`;
+      }
+    }
+
+   async function cargarDatosReferidosPerfil() {
+  const userId = localStorage.getItem('user_id');
+  const userEmail = localStorage.getItem('user_email');
+  if (!userId && !userEmail) return;
+
+  let query = supabaseClient
+    .from('profiles')
+    .select('id, balance, referral_code, referral_tokens');
+
+  query = userId ? query.eq('id', userId) : query.eq('email', userEmail);
+  const { data: profile, error } = await query.maybeSingle();
+
+  if (error || !profile) return;
+
+  let codigo = (profile.referral_code || '').trim().toUpperCase();
+  if (!codigo) {
+    codigo = generarCodigoReferidoDashboard();
+    await supabaseClient
+      .from('profiles')
+      .update({ referral_code: codigo })
+      .eq('id', profile.id);
+  }
+
+  const tokens = Number(profile.referral_tokens || 0);
+  const equivalenteVes = tokens * TASA_TOKEN_A_VES;
+
+  const codeEl = document.getElementById('profile-referral-code');
+  const tokensEl = document.getElementById('profile-referral-tokens');
+  const eqVesEl = document.getElementById('profile-tokens-ves');
+  const countEl = document.getElementById('profile-referral-count');
+
+  if (codeEl) codeEl.innerText = codigo;
+  if (tokensEl) tokensEl.innerText = tokens.toLocaleString('es-VE');
+  if (eqVesEl) {
+    eqVesEl.innerText = equivalenteVes.toLocaleString('es-VE', { minimumFractionDigits: 2 }) + ' VES';
+  }
+
+  // Contar desde referral_signups
+  const { count: countSignups } = await supabaseClient
+    .from('referral_signups')
+    .select('*', { count: 'exact', head: true })
+    .eq('referrer_id', profile.id);
+
+  // Contar también desde profiles por referred_by como respaldo
+  const { count: countProfiles } = await supabaseClient
+    .from('profiles')
+    .select('*', { count: 'exact', head: true })
+    .eq('referred_by', codigo);
+
+  let totalReferidos = Math.max(Number(countSignups || 0), Number(countProfiles || 0));
+
+  // Si ya hay tokens acumulados pero los conteos dan 0, calcular al menos 1 si aplica
+  if (totalReferidos === 0 && tokens > 0) {
+    totalReferidos = Math.max(1, Math.floor(tokens / 100));
+  }
+
+  if (countEl) countEl.innerText = String(totalReferidos);
+}
+
+    async function convertirTokensAVes() {
+      const inputEl = document.getElementById('convert-tokens-input');
+      const msgEl = document.getElementById('referral-status-msg');
+      if (!inputEl || !msgEl) return;
+
+      const cantidadTokens = Math.floor(Number(inputEl.value));
+      if (!cantidadTokens || cantidadTokens < MINIMO_TOKENS_CANJE) {
+        msgEl.style.color = '#f87171';
+        msgEl.innerText = `⚠️ Debes convertir al menos ${MINIMO_TOKENS_CANJE.toLocaleString('es-VE')} tokens (1.000 tokens = 1.000 VES).`;
+        return;
+      }
+
+      const userId = localStorage.getItem('user_id');
+      const userEmail = localStorage.getItem('user_email');
+      if (!userId && !userEmail) {
+        msgEl.style.color = '#f87171';
+        msgEl.innerText = '❌ Sesión no válida.';
+        return;
+      }
+
+      let query = supabaseClient
+        .from('profiles')
+        .select('id, balance, referral_tokens');
+
+      query = userId ? query.eq('id', userId) : query.eq('email', userEmail);
+      const { data: profile, error } = await query.maybeSingle();
+
+      if (error || !profile) {
+        msgEl.style.color = '#f87171';
+        msgEl.innerText = '❌ No se pudo verificar tu saldo de tokens.';
+        return;
+      }
+
+      const tokensActuales = Number(profile.referral_tokens || 0);
+      if (cantidadTokens > tokensActuales) {
+        msgEl.style.color = '#f87171';
+        msgEl.innerText = `❌ Solo tienes ${tokensActuales.toLocaleString('es-VE')} tokens disponibles.`;
+        return;
+      }
+
+      const montoVes = cantidadTokens * TASA_TOKEN_A_VES;
+      const nuevosTokens = tokensActuales - cantidadTokens;
+      const nuevoSaldoVes = Number(profile.balance || 0) + montoVes;
+
+      const { error: updateErr } = await supabaseClient
+        .from('profiles')
+        .update({
+          referral_tokens: nuevosTokens,
+          balance: nuevoSaldoVes
+        })
+        .eq('id', profile.id);
+
+      if (updateErr) {
+        msgEl.style.color = '#f87171';
+        msgEl.innerText = '❌ Error al cambiar tokens: ' + updateErr.message;
+        return;
+      }
+
+      await supabaseClient
+        .from('token_conversions')
+        .insert([{
+          user_id: profile.id,
+          tokens_spent: cantidadTokens,
+          ves_received: montoVes
+        }]);
+
+      localStorage.setItem('user_balance', nuevoSaldoVes.toString());
+      inputEl.value = '';
+
+      msgEl.style.color = '#4ade80';
+      msgEl.innerText = `✅ Convertiste ${cantidadTokens.toLocaleString('es-VE')} tokens en ${montoVes.toLocaleString('es-VE', { minimumFractionDigits: 2 })} VES.`;
+
+      await loadUserData();
+      await cargarDatosReferidosPerfil();
+    }
 
     // --- FUNCIÓN GLOBAL PARA COPIAR AL PORTAPAPELES ---
     function copiarAlPortapapeles(texto, boton) {
@@ -866,28 +1044,6 @@ document.addEventListener('contextmenu', function(e) {
       window.location.href = 'game.html';
     }
 
-    // LISTADO DE 100 SKINS
-    const SKINS_LIST = [
-      { id: 've', name: 'Venezuela 🇻🇪', style: 'linear-gradient(90deg, #ffcc00 33%, #00247d 33%, #00247d 66%, #cf142b 66%)' },
-      { id: 'neon_cyber', name: 'Neón Cyberpunk', style: 'linear-gradient(90deg, #00f2fe 0%, #4facfe 100%)' },
-      { id: 'fire', name: 'Neón Fuego', style: 'linear-gradient(90deg, #ff0844 0%, #ffb199 100%)' },
-      { id: 'violet', name: 'Neón Violeta', style: 'linear-gradient(90deg, #b224ef 0%, #7579ff 100%)' },
-      { id: 'camo', name: 'Camuflaje Militar', style: 'linear-gradient(90deg, #4b5320 0%, #8b8c7a 50%, #2e3b23 100%)' },
-      { id: 'gold', name: 'Dorado VIP', style: 'linear-gradient(90deg, #bf953f 0%, #fcf6ba 25%, #b38728 50%, #fbf5b7 75%, #aa771c 100%)' },
-      { id: 'rainbow', name: 'Arcoíris', style: 'linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet)' },
-      { id: 'crimson', name: 'Dragón Carmesí', style: 'linear-gradient(90deg, #870003 0%, #ff0000 100%)' },
-      { id: 'emerald', name: 'Escamas Esmeralda', style: 'linear-gradient(90deg, #0ba360 0%, #3cba92 100%)' }
-    ];
-
-    for (let i = 10; i <= 100; i++) {
-      const hue = (i * 137.5) % 360;
-      SKINS_LIST.push({
-        id: `skin_${i}`,
-        name: `Skin Épica #${i}`,
-        style: `linear-gradient(90deg, hsl(${hue}, 80%, 50%), hsl(${(hue + 40) % 360}, 80%, 40%))`
-      });
-    }
-
     function switchTab(tabId, event) {
       document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
@@ -904,6 +1060,9 @@ document.addEventListener('contextmenu', function(e) {
       }
       if (tabId === 'deposit') {
         selectPaymentMethod(selectedPaymentMethod);
+      }
+      if (tabId === 'profile') {
+        cargarDatosReferidosPerfil();
       }
     }
 
@@ -933,11 +1092,8 @@ document.addEventListener('contextmenu', function(e) {
       }
 
       let texto = data.content || "";
-      
-      // Limpiamos espacios múltiples y saltos extraños
       texto = texto.replace(/\s+/g, ' ');
 
-      // Lista ampliada de etiquetas clave para forzarles un salto de línea antes
       const palabrasClave = [
         'BANCO:', 'CUENTA:', 'NUMERO DE CUENTA:', 'NRO DE CUENTA:', 
         'TELÉFONO:', 'TELEFONO:', 'CELULAR:', 
@@ -983,6 +1139,7 @@ document.addEventListener('contextmenu', function(e) {
 
       infoBox.innerHTML = htmlFilas;
     }
+
     async function loadUserData() {
       const userId = localStorage.getItem('user_id');
       const userEmail = localStorage.getItem('user_email');
@@ -1052,6 +1209,7 @@ document.addEventListener('contextmenu', function(e) {
       document.getElementById('deposit-amount').value = '';
       document.getElementById('deposit-reference').value = '';
     }
+
     async function loadUserBankAccount() {
       const userId = localStorage.getItem('user_id');
       const selectEl = document.getElementById('saved-accounts-select');
@@ -1078,7 +1236,7 @@ document.addEventListener('contextmenu', function(e) {
       }).join('');
     }
 
-   // --- FUNCIÓN DEFINITIVA PARA GUARDAR DATOS BANCARIOS ---
+    // --- FUNCIÓN DEFINITIVA PARA GUARDAR DATOS BANCARIOS ---
     async function saveBankAccount() {
       const bankName = document.getElementById('bank-name')?.value.trim();
       const phone = document.getElementById('bank-phone')?.value.trim();
@@ -1089,7 +1247,6 @@ document.addEventListener('contextmenu', function(e) {
         return;
       }
 
-      // Obtenemos el ID del usuario actual de la sesión
       const userId = sessionStorage.getItem('user_id') || localStorage.getItem('user_id');
       
       if (!userId) {
@@ -1097,13 +1254,11 @@ document.addEventListener('contextmenu', function(e) {
         return;
       }
 
-      // 1. Primero borramos registros anteriores de este usuario para evitar duplicados
       await supabaseClient
         .from('user_bank_accounts')
         .delete()
         .eq('user_id', userId);
 
-      // 2. Insertamos el nuevo registro limpio
       const { error } = await supabaseClient
         .from('user_bank_accounts')
         .insert({
@@ -1120,6 +1275,7 @@ document.addEventListener('contextmenu', function(e) {
 
       alert("✅ ¡Datos bancarios guardados con éxito!");
     }
+
     async function submitWithdrawal() {
       const amountInput = document.getElementById('withdraw-amount').value;
       const selectElement = document.getElementById('saved-accounts-select').value;
@@ -1201,8 +1357,8 @@ document.addEventListener('contextmenu', function(e) {
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-    
       loadUserData();
+      cargarDatosReferidosPerfil();
       selectPaymentMethod('pago_movil');
     });
   </script>
