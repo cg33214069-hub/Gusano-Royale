@@ -38,6 +38,7 @@ function saveSecureBalance(amount) {
 // 1. CONFIGURACIÓN DEL MUNDO Y COMIDA EN EL MAPA
 // ==========================================
 let WORLD_SIZE = 2500;
+const MAX_LOOT_ORBS = 140;
 
 function getCenterSpawnPos(spread = 120) {
   const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
@@ -223,6 +224,14 @@ function getRandomFoodColor() {
   return FOOD_COLORS[Math.floor(Math.random() * FOOD_COLORS.length)];
 }
 
+function appendLootOrbsWithLimit(newOrbs) {
+  if (!Array.isArray(newOrbs) || newOrbs.length === 0) return;
+  sharedLootOrbs.push(...newOrbs);
+  if (sharedLootOrbs.length > MAX_LOOT_ORBS) {
+    sharedLootOrbs.splice(0, sharedLootOrbs.length - MAX_LOOT_ORBS);
+  }
+}
+
 const roomChannelName = `arena_ves_${selectedEntryFee}`;
 
 let socket = null;
@@ -308,12 +317,21 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
     }
   });
 
+  gameRoom.on('broadcast', { event: 'spawn_loot_batch' }, ({ payload }) => {
+    if (Array.isArray(payload.orbs)) {
+      appendLootOrbsWithLimit(payload.orbs);
+    }
+  });
+
   gameRoom.on('broadcast', { event: 'spawn_loot' }, ({ payload }) => {
-    sharedLootOrbs.push(payload);
+    appendLootOrbsWithLimit([payload]);
   });
 
   gameRoom.on('broadcast', { event: 'collect_loot' }, ({ payload }) => {
-    if (sharedLootOrbs[payload.index]) {
+    if (payload && payload.lootId) {
+      const idx = sharedLootOrbs.findIndex(o => o.id === payload.lootId);
+      if (idx !== -1) sharedLootOrbs.splice(idx, 1);
+    } else if (payload && typeof payload.index === 'number' && sharedLootOrbs[payload.index]) {
       sharedLootOrbs.splice(payload.index, 1);
     }
   });
@@ -360,8 +378,9 @@ function dropLootOnDeath(x, y, totalVes, bodySegments = []) {
     ? bodySegments
     : [{ x, y }];
 
-  const drops = Math.min(60, Math.max(35, validBody.length * 2));
+  const drops = Math.min(45, Math.max(30, validBody.length * 2));
   const valuePerDrop = totalVes > 0 ? Math.max(0.5, Number((totalVes / drops).toFixed(2))) : 1;
+  const batchOrbs = [];
 
   for (let i = 0; i < drops; i++) {
     const progress = drops > 1 ? i / (drops - 1) : 0;
@@ -379,23 +398,24 @@ function dropLootOnDeath(x, y, totalVes, bodySegments = []) {
     const jitterAngle = Math.random() * Math.PI * 2;
     const jitterDist = Math.random() * 8;
 
-    const lootItem = {
-      x: baseX + Math.cos(jitterAngle) * jitterDist,
-      y: baseY + Math.sin(jitterAngle) * jitterDist,
+    batchOrbs.push({
+      id: 'loot_' + Math.random().toString(36).substring(2, 9),
+      x: Number((baseX + Math.cos(jitterAngle) * jitterDist).toFixed(1)),
+      y: Number((baseY + Math.sin(jitterAngle) * jitterDist).toFixed(1)),
       ves: valuePerDrop,
       radius: Math.max(5.5, Math.min(11, 5.5 + Math.sqrt(valuePerDrop) * 0.7)),
       color: getRandomFoodColor()
-    };
+    });
+  }
 
-    sharedLootOrbs.push(lootItem);
+  appendLootOrbsWithLimit(batchOrbs);
 
-    if (gameRoom) {
-      gameRoom.send({
-        type: 'broadcast',
-        event: 'spawn_loot',
-        payload: lootItem
-      });
-    }
+  if (gameRoom) {
+    gameRoom.send({
+      type: 'broadcast',
+      event: 'spawn_loot_batch',
+      payload: { orbs: batchOrbs }
+    });
   }
 }
 
@@ -473,14 +493,15 @@ function updateLocalPlayer() {
     const dy = player.y - orb.y;
     if (Math.abs(dx) < 35 && Math.abs(dy) < 35) {
       if (Math.hypot(dx, dy) < player.radius + orbRadius + 8) {
-        player.ves += orb.ves; 
+        player.ves += orb.ves;
+        const collectedId = orb.id;
         sharedLootOrbs.splice(i, 1);
 
-        if (gameRoom) {
+        if (gameRoom && collectedId) {
           gameRoom.send({
             type: 'broadcast',
             event: 'collect_loot',
-            payload: { index: i }
+            payload: { lootId: collectedId }
           });
         }
       }
@@ -489,7 +510,7 @@ function updateLocalPlayer() {
 
   if (gameRoom && gameActive) {
     const now = Date.now();
-    if (now - lastSendTime > 50) {
+    if (now - lastSendTime > 90) {
       lastSendTime = now;
       gameRoom.send({
         type: 'broadcast',
@@ -497,14 +518,14 @@ function updateLocalPlayer() {
         payload: {
           id: player.id,
           name: player.name,
-          x: player.x,
-          y: player.y,
-          angle: player.angle,
+          x: Number(player.x.toFixed(1)),
+          y: Number(player.y.toFixed(1)),
+          angle: Number(player.angle.toFixed(3)),
           speed: currentSpeed,
-          ves: player.ves,
+          ves: Math.floor(player.ves),
           skinId: player.skinId,
           color: player.color,
-          body: player.body.slice(0, 20)
+          body: player.body.slice(0, 12)
         }
       });
     }
@@ -533,8 +554,8 @@ function drawPlayer(p, camera, isLocal) {
             p.targetX += Math.cos(p.targetAngle) * spd;
             p.targetY += Math.sin(p.targetAngle) * spd;
           }
-          p.x += (p.targetX - p.x) * 0.15;
-          p.y += (p.targetY - p.y) * 0.15;
+          p.x += (p.targetX - p.x) * 0.18;
+          p.y += (p.targetY - p.y) * 0.18;
         }
       }
     }
@@ -661,7 +682,7 @@ function drawLeaderboard() {
 function cleanupInactiveRemotePlayers() {
   const now = Date.now();
   Object.keys(remotePlayers).forEach(id => {
-    if (now - remotePlayers[id].lastUpdate > 3000) {
+    if (now - remotePlayers[id].lastUpdate > 3500) {
       delete remotePlayers[id];
     }
   });
@@ -671,19 +692,24 @@ function checkRealPlayerCollisions() {
   cleanupInactiveRemotePlayers();
   if (isSpectator || currentPhase !== 'COMBAT' || !player.alive) return;
 
+  const hitThreshold = player.radius + 7;
+
   Object.values(remotePlayers).forEach(friend => {
-    if (!friend.body) return;
+    if (!friend.body || friend.body.length === 0) return;
 
-    for (let seg of friend.body) {
-      if (Math.hypot(player.x - seg.x, player.y - seg.y) < player.radius + 6) {
-        player.alive = false;
-        dropLootOnDeath(player.x, player.y, player.ves, player.body);
+    for (let i = 0; i < friend.body.length; i += 2) {
+      const seg = friend.body[i];
+      if (Math.abs(player.x - seg.x) < 40 && Math.abs(player.y - seg.y) < 40) {
+        if (Math.hypot(player.x - seg.x, player.y - seg.y) < hitThreshold) {
+          player.alive = false;
+          dropLootOnDeath(player.x, player.y, player.ves, player.body);
 
-        if (gameRoom) {
-          gameRoom.send({ type: 'broadcast', event: 'player_died', payload: { id: player.id } });
+          if (gameRoom) {
+            gameRoom.send({ type: 'broadcast', event: 'player_died', payload: { id: player.id } });
+          }
+          endGame(false, `Chocaste contra el cuerpo de ${friend.name}. ¡Has quedado eliminado!`);
+          return;
         }
-        endGame(false, `Chocaste contra el cuerpo de ${friend.name}. ¡Has quedado eliminado!`);
-        return;
       }
     }
   });
@@ -853,7 +879,7 @@ function gameLoop(timestamp) {
         });
       }
 
-      // Dibujar botín soltado al morir con borde visible
+      // Dibujar botín soltado al morir
       sharedLootOrbs.forEach(orb => {
         const sx = orb.x - camera.x;
         const sy = orb.y - camera.y;
@@ -863,9 +889,6 @@ function gameLoop(timestamp) {
           ctx.arc(sx, sy, r, 0, Math.PI * 2);
           ctx.fillStyle = orb.color || '#facc15';
           ctx.fill();
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = '#ffffff';
-          ctx.stroke();
         }
       });
 
