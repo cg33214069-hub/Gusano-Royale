@@ -199,50 +199,8 @@
 
 <script>
 
-  // ==========================================
-  // ESCUDO ANTI-TRAMPAS / BLOQUEO DE CONSOLA (F12)
-  // ==========================================
-  // Excepción si eres tú (el admin espectando) para que no te bloquee tu propia consola si la abres en admin.html
-  const isSpectatingAdmin = Boolean(window.isSpectatorMode);
-
-  if (!isSpectatingAdmin) {
-    // 1. Bloquear atajos de teclado (F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U)
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'F12') {
-        e.preventDefault();
-        return false;
-      }
-      if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) {
-        e.preventDefault();
-        return false;
-      }
-      if (e.ctrlKey && e.key === 'u') {
-        e.preventDefault();
-        return false;
-      }
-    });
-
-    // 2. Bloquear menú contextual (clic derecho -> Inspeccionar)
-    document.addEventListener('contextmenu', function(e) {
-      e.preventDefault();
-    });
-
-    // 3. Detección automática si abren las herramientas de desarrollador
-    let devtoolsOpen = false;
-    const threshold = 160;
-    setInterval(() => {
-      const widthThreshold = window.outerWidth - window.innerWidth > threshold;
-      const heightThreshold = window.outerHeight - window.innerHeight > threshold;
-      
-      if (widthThreshold || heightThreshold) {
-        if (!devtoolsOpen) {
-          devtoolsOpen = true;
-          alert("⚠️ ¡Se detectó la consola abierta! Por seguridad serás expulsado de la partida.");
-          window.location.href = 'dashboard.html';
-        }
-      }
-    }, 1000);
-  }
+  
+  
   
   // Inicialización del cliente Supabase
   const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
