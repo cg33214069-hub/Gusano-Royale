@@ -220,17 +220,17 @@ if (boostBtn && !isSpectator) {
 }
 
 // ==========================================
-// 2. CONEXIÓN A SUPABASE Y SOCKETS DE RENDER
+// 2. CONEXIÓN A SUPABASE Y SERVIDOR DE JUEGO
 // ==========================================
 let gameRoom = null;
 const myPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
-let remotePlayers = {}; 
-let sharedLootOrbs = []; 
+let remotePlayers = {};
+let sharedLootOrbs = [];
 
 let mapaComidaActiva = true;
 let cantidadComidaConfig = 150;
 let valorComidaConfig = 10.00;
-let arenaFoodOrbs = []; 
+let arenaFoodOrbs = [];
 
 const FOOD_COLORS = ['#38bdf8', '#4ade80', '#facc15', '#f97316', '#e879f9', '#f43f5e', '#2dd4bf'];
 const FOOD_RADIUS = 3.5;
@@ -248,15 +248,71 @@ function appendLootOrbsWithLimit(newOrbs) {
 }
 
 const roomChannelName = `arena_ves_${selectedEntryFee}`;
-
+const SERVER_URL = 'https://gusano-royale.onrender.com';
 let socket = null;
-if (typeof io !== 'undefined') {
-  socket = io('https://gusano-royale.onrender.com');
-  
+let connectedToGameServer = false;
+
+function initGameServerSocket() {
+  if (typeof io === 'undefined') return;
+
+  socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
+
   socket.on('connect', () => {
-    console.log('¡Conectado al servidor de Render con éxito!');
+    connectedToGameServer = true;
+    console.log('¡Conectado al servidor de juego con éxito!');
+    socket.emit('join_arena', {
+      roomId: roomChannelName,
+      entryFee: selectedEntryFee,
+      name: playerName,
+      ves: isSpectator ? 0 : selectedEntryFee,
+      skinId: selectedSkin,
+      color: selectedColor,
+      spectator: isSpectator
+    });
+  });
+
+  socket.on('world_state', (data) => {
+    if (!data || !data.players) return;
+    if (data.worldSize) {
+      WORLD_SIZE = Number(data.worldSize) || WORLD_SIZE;
+    }
+
+    const updatedRemotes = {};
+    Object.values(data.players).forEach((sp) => {
+      if (!isSpectator && sp.id === socket.id) {
+        if (typeof sp.x === 'number' && typeof sp.y === 'number') {
+          player.x = sp.x;
+          player.y = sp.y;
+        }
+        if (Array.isArray(sp.body) && sp.body.length > 0) {
+          player.body = sp.body;
+        }
+        return;
+      }
+
+      const prev = remotePlayers[sp.id];
+      updatedRemotes[sp.id] = {
+        ...sp,
+        x: prev && typeof prev.x === 'number' ? prev.x : sp.x,
+        y: prev && typeof prev.y === 'number' ? prev.y : sp.y,
+        targetX: sp.x,
+        targetY: sp.y,
+        targetAngle: sp.angle,
+        currentSpeed: sp.speed || 2.6,
+        targetBody: sp.body,
+        lastUpdate: Date.now()
+      };
+    });
+
+    remotePlayers = updatedRemotes;
+  });
+
+  socket.on('disconnect', () => {
+    connectedToGameServer = false;
   });
 }
+
+initGameServerSocket();
 
 async function verificarYCargarComida() {
   if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
@@ -300,46 +356,20 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
     config: { broadcast: { self: false } }
   });
 
-  gameRoom.on('broadcast', { event: 'player_move' }, ({ payload }) => {
-    if (payload.id !== myPlayerId) {
-      if (!remotePlayers[payload.id]) {
-        remotePlayers[payload.id] = {
-          ...payload,
-          targetX: payload.x,
-          targetY: payload.y,
-          targetAngle: payload.angle,
-          currentSpeed: payload.speed || 2.6,
-          targetBody: payload.body
-        };
-      } else {
-        let p = remotePlayers[payload.id];
-        p.targetX = payload.x;
-        p.targetY = payload.y;
-        p.targetAngle = payload.angle;
-        p.currentSpeed = payload.speed || 2.6;
-        p.ves = payload.ves;
-        p.skinId = payload.skinId;
-        p.color = payload.color;
-        p.targetBody = payload.body;
-      }
-      remotePlayers[payload.id].lastUpdate = Date.now();
-    }
-  });
-
   gameRoom.on('broadcast', { event: 'player_died' }, ({ payload }) => {
-    if (remotePlayers[payload.id]) {
+    if (payload && remotePlayers[payload.id]) {
       delete remotePlayers[payload.id];
     }
   });
 
   gameRoom.on('broadcast', { event: 'spawn_loot_batch' }, ({ payload }) => {
-    if (Array.isArray(payload.orbs)) {
+    if (payload && Array.isArray(payload.orbs)) {
       appendLootOrbsWithLimit(payload.orbs);
     }
   });
 
   gameRoom.on('broadcast', { event: 'spawn_loot' }, ({ payload }) => {
-    appendLootOrbsWithLimit([payload]);
+    if (payload) appendLootOrbsWithLimit([payload]);
   });
 
   gameRoom.on('broadcast', { event: 'collect_loot' }, ({ payload }) => {
@@ -466,14 +496,9 @@ function updateLocalPlayer() {
   player.y += Math.sin(player.angle) * currentSpeed;
 
   const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
-  if (currentPhase === 'PREPARATION') {
-    const margin = player.radius + 10;
-    player.x = Math.max(margin, Math.min(mapSizeSafe - margin, player.x));
-    player.y = Math.max(margin, Math.min(mapSizeSafe - margin, player.y));
-  } else if (!player.alive) {
-    player.x = Math.max(0, Math.min(mapSizeSafe, player.x));
-    player.y = Math.max(0, Math.min(mapSizeSafe, player.y));
-  }
+  const margin = player.radius + 10;
+  player.x = Math.max(margin, Math.min(mapSizeSafe - margin, player.x));
+  player.y = Math.max(margin, Math.min(mapSizeSafe - margin, player.y));
 
   player.body.unshift({ x: player.x, y: player.y });
   while (player.body.length > player.length) {
@@ -522,25 +547,14 @@ function updateLocalPlayer() {
     }
   }
 
-  if (gameRoom && gameActive) {
+  if (connectedToGameServer && socket && gameActive) {
     const now = Date.now();
-    if (now - lastSendTime > 90) {
+    if (now - lastSendTime > 60) {
       lastSendTime = now;
-      gameRoom.send({
-        type: 'broadcast',
-        event: 'player_move',
-        payload: {
-          id: player.id,
-          name: player.name,
-          x: Number(player.x.toFixed(1)),
-          y: Number(player.y.toFixed(1)),
-          angle: Number(player.angle.toFixed(3)),
-          speed: currentSpeed,
-          ves: Math.floor(player.ves),
-          skinId: player.skinId,
-          color: player.color,
-          body: player.body.slice(0, 12)
-        }
+      socket.emit('player_input', {
+        angle: Number(player.angle.toFixed(3)),
+        boosting: Boolean(isBoosting),
+        ves: Math.floor(player.ves)
       });
     }
   }
@@ -561,33 +575,16 @@ function drawPlayer(p, camera, isLocal) {
           p.x = p.targetX;
           p.y = p.targetY;
         } else {
-          const spd = p.currentSpeed || 2.6;
-          if (p.targetAngle !== undefined) {
-            p.x += Math.cos(p.targetAngle) * spd;
-            p.y += Math.sin(p.targetAngle) * spd;
-            p.targetX += Math.cos(p.targetAngle) * spd;
-            p.targetY += Math.sin(p.targetAngle) * spd;
-          }
-          p.x += (p.targetX - p.x) * 0.18;
-          p.y += (p.targetY - p.y) * 0.18;
+          p.x += (p.targetX - p.x) * 0.35;
+          p.y += (p.targetY - p.y) * 0.35;
         }
       }
     }
 
-    if (p.targetBody && Array.isArray(p.targetBody)) {
-      if (!p.body || p.body.length !== p.targetBody.length) {
-        p.body = p.targetBody.map(seg => ({ x: seg.x, y: seg.y }));
-      } else {
-        p.body[0].x = p.x;
-        p.body[0].y = p.y;
-        for (let i = 1; i < p.body.length; i++) {
-          const prev = p.body[i - 1];
-          const curr = p.body[i];
-          const targetSeg = p.targetBody[i];
-          curr.x += ((prev.x + targetSeg.x) * 0.5 - curr.x) * 0.35;
-          curr.y += ((prev.y + targetSeg.y) * 0.5 - curr.y) * 0.35;
-        }
-      }
+    if (p.targetBody && Array.isArray(p.targetBody) && p.targetBody.length > 0) {
+      p.body = p.targetBody.map((seg, idx) =>
+        idx === 0 ? { x: p.x, y: p.y } : { x: seg.x, y: seg.y }
+      );
     }
   }
 
@@ -696,7 +693,7 @@ function drawLeaderboard() {
 function cleanupInactiveRemotePlayers() {
   const now = Date.now();
   Object.keys(remotePlayers).forEach(id => {
-    if (now - remotePlayers[id].lastUpdate > 3500) {
+    if (now - remotePlayers[id].lastUpdate > 4500) {
       delete remotePlayers[id];
     }
   });
