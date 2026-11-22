@@ -1067,8 +1067,11 @@ iniciarSalaConCarga();
 // ==========================================
 // FUNCIÓN ENDGAME OPTIMIZADA PARA GUARDAR EL PREMIO
 // ==========================================
+let partidaFinalizada = false;
+
 async function endGame(survived, reason) {
-  if (isSpectator) return;
+  if (isSpectator || partidaFinalizada) return;
+  partidaFinalizada = true;
 
   gameActive = false;
   clearInterval(timerInterval);
@@ -1081,29 +1084,37 @@ async function endGame(survived, reason) {
   if (endModal) endModal.style.display = 'flex';
   activarBarraSalidaEnModalFin();
 
-  const finalAmount = survived ? Math.floor(player.ves) : 0;
+  const finalAmount = survived ? Math.max(0, Math.floor(Number(player.ves) || 0)) : 0;
 
   if (survived) {
-    if (endTitle) { endTitle.innerText = "¡VICTORIA REAL!"; endTitle.style.color = "#4ade80"; }
+    if (endTitle) {
+      endTitle.innerText = '¡VICTORIA REAL!';
+      endTitle.style.color = '#4ade80';
+    }
     if (endDesc) endDesc.innerText = reason;
     if (endVes) endVes.innerText = `${finalAmount.toLocaleString('es-VE')} VES`;
   } else {
-    if (endTitle) { endTitle.innerText = "ELIMINADO"; endTitle.style.color = "#ef4444"; }
+    if (endTitle) {
+      endTitle.innerText = 'ELIMINADO';
+      endTitle.style.color = '#ef4444';
+    }
     if (endDesc) endDesc.innerText = reason;
-    if (endVes) endVes.innerText = "0 VES";
+    if (endVes) endVes.innerText = '0 VES';
   }
 
   if (survived && finalAmount > 0) {
-    let savedBalance = getSecureBalance();
-    savedBalance += finalAmount;
-    saveSecureBalance(savedBalance);
-
     promesaGuardadoFinal = (async () => {
-      if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+      if (typeof supabaseClient === 'undefined' || !supabaseClient) {
+        saveSecureBalance(getSecureBalance() + finalAmount);
+        return;
+      }
 
       const userId = localStorage.getItem('user_id');
       const userEmail = localStorage.getItem('user_email');
-      if (!userId && !userEmail) return;
+      if (!userId && !userEmail) {
+        saveSecureBalance(getSecureBalance() + finalAmount);
+        return;
+      }
 
       let query = supabaseClient.from('profiles').select('id, balance');
       if (userId) {
@@ -1116,7 +1127,7 @@ async function endGame(survived, reason) {
 
       if (!errFetch && profile) {
         const balanceActualServidor = Number(profile.balance || 0);
-        const nuevoBalanceServidor = balanceActualServidor + finalAmount;
+        const nuevoBalanceServidor = Math.max(0, Math.floor(balanceActualServidor + finalAmount));
 
         const { error: errUpdate } = await supabaseClient
           .from('profiles')
@@ -1124,12 +1135,15 @@ async function endGame(survived, reason) {
           .eq('id', profile.id);
 
         if (errUpdate) {
-          console.error("❌ Error de Supabase al sumar la ganancia:", errUpdate.message);
+          console.error('❌ Error de Supabase al sumar la ganancia:', errUpdate.message);
+          saveSecureBalance(getSecureBalance() + finalAmount);
         } else {
-          console.log("✅ ¡Ganancia de", finalAmount, "VES sumada con éxito en Supabase!");
+          saveSecureBalance(nuevoBalanceServidor);
+          console.log('✅ ¡Ganancia de', finalAmount, 'VES sumada! Nuevo saldo:', nuevoBalanceServidor);
         }
       } else {
-        console.error("❌ No se pudo encontrar el perfil en Supabase para actualizar el premio.");
+        console.error('❌ No se pudo encontrar el perfil en Supabase para actualizar el premio.');
+        saveSecureBalance(getSecureBalance() + finalAmount);
       }
     })();
 
