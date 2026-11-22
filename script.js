@@ -248,7 +248,7 @@ function appendLootOrbsWithLimit(newOrbs) {
 }
 
 const roomChannelName = `arena_ves_${selectedEntryFee}`;
-const SERVER_URL = 'https://gusano-royale-1.onrender.com/';
+const SERVER_URL = 'https://gusano-royale-1.onrender.com//';
 let socket = null;
 let connectedToGameServer = false;
 
