@@ -15,12 +15,12 @@ const ROOM_ENTRY_MAP = {
 function getSecureBalance() {
   const encoded = localStorage.getItem('secure_user_balance');
   if (!encoded) {
-    const defaultVal = 5000;
+    const defaultVal = 0;
     localStorage.setItem('secure_user_balance', btoa(defaultVal.toString()));
     return defaultVal;
   }
   try {
-    const decoded = parseInt(atob(encoded));
+    const decoded = parseInt(atob(encoded), 10);
     return isNaN(decoded) ? 0 : decoded;
   } catch (e) {
     return 0;
@@ -29,9 +29,24 @@ function getSecureBalance() {
 
 function saveSecureBalance(amount) {
   if (isSpectator) return;
-  const cleanAmount = Math.max(0, Math.floor(amount));
+  const cleanAmount = Math.max(0, Math.floor(Number(amount) || 0));
   localStorage.setItem('secure_user_balance', btoa(cleanAmount.toString()));
   localStorage.setItem('user_balance', cleanAmount.toString());
+}
+
+// ==========================================
+// CONTROL ANTI-DUPLICADOS POR PARTIDA (DINERO REAL)
+// ==========================================
+const currentMatchId = 'match_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+let entradaDescontadaConfirmada = false;
+let premioAcreditadoConfirmado = false;
+
+function yaSeCobroPartida(matchId) {
+  return sessionStorage.getItem(`claimed_${matchId}`) === 'true';
+}
+
+function marcarPartidaCobrada(matchId) {
+  sessionStorage.setItem(`claimed_${matchId}`, 'true');
 }
 
 // ==========================================
@@ -69,7 +84,7 @@ function resetPlayerToCenter() {
 async function cargarTamanoMapaGlobal() {
   if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
 
-  const { data, error } = await supabaseClient
+  const { data } = await supabaseClient
     .from('game_config')
     .select('map_size')
     .eq('id', 1)
@@ -82,8 +97,8 @@ async function cargarTamanoMapaGlobal() {
   }
 }
 
-const PREPARATION_TIME = 10; 
-const COMBAT_TIME = 60;      
+const PREPARATION_TIME = 10;
+const COMBAT_TIME = 60;
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -104,7 +119,7 @@ resizeCanvas();
 
 let selectedEntryFee = isSpectator
   ? (ROOM_ENTRY_MAP[window.spectatorRoomId] || 50)
-  : (parseInt(localStorage.getItem('selected_entry')) || 100);
+  : (parseInt(localStorage.getItem('selected_entry'), 10) || 100);
 
 let selectedSkin = localStorage.getItem('selected_skin') || 've';
 let selectedColor = localStorage.getItem('worm_color') || '#22c55e';
@@ -129,54 +144,41 @@ window.addEventListener('click', (e) => {
 });
 
 // ==========================================
-// DESCUENTO AUTOMÁTICO Y SEGURO DE LA ENTRADA EN SUPABASE
+// DESCUENTO ATÓMICO DE LA ENTRADA EN SUPABASE (RPC)
 // ==========================================
 let yaDescontoEntrada = false;
 
 async function descontarEntradaEnSupabase() {
-  if (isSpectator || yaDescontoEntrada) return;
-  if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+  if (isSpectator || yaDescontoEntrada || entradaDescontadaConfirmada) return entradaDescontadaConfirmada;
+  if (typeof supabaseClient === 'undefined' || !supabaseClient) return false;
 
   const userId = localStorage.getItem('user_id');
-  const userEmail = localStorage.getItem('user_email');
-
-  if (!userId && !userEmail) return;
+  if (!userId) {
+    console.warn('⚠️ Falta user_id para descontar entrada de forma segura.');
+    return false;
+  }
 
   yaDescontoEntrada = true;
+  const montoEntrada = Math.abs(Math.floor(Number(selectedEntryFee) || 0));
 
-  let query = supabaseClient.from('profiles').select('id, balance');
-  if (userId) {
-    query = query.eq('id', userId);
-  } else {
-    query = query.eq('email', userEmail);
-  }
+  const { data, error } = await supabaseClient.rpc('ajustar_saldo_seguro', {
+    p_user_id: userId,
+    p_delta: -montoEntrada
+  });
 
-  const { data: profile, error } = await query.maybeSingle();
-  if (error || !profile) {
+  const row = Array.isArray(data) ? data[0] : data;
+
+  if (error || !row || !row.ok) {
+    console.warn('⚠️ No se pudo descontar la entrada:', error?.message || row?.mensaje || 'Saldo insuficiente');
     yaDescontoEntrada = false;
-    return;
+    return false;
   }
 
-  const saldoActual = Number(profile.balance || 0);
-  if (saldoActual >= selectedEntryFee) {
-    const nuevoSaldo = saldoActual - selectedEntryFee;
-
-    const { error: errUpdate } = await supabaseClient
-      .from('profiles')
-      .update({ balance: nuevoSaldo })
-      .eq('id', profile.id);
-
-    if (errUpdate) {
-      console.error('❌ Error al descontar entrada en Supabase:', errUpdate.message);
-      yaDescontoEntrada = false;
-      return;
-    }
-
-    saveSecureBalance(nuevoSaldo);
-    console.log(`✅ Entrada de ${selectedEntryFee} VES descontada una sola vez. Nuevo saldo: ${nuevoSaldo}`);
-  } else {
-    console.warn('⚠️ Saldo insuficiente para descontar la entrada.');
-  }
+  const nuevoSaldo = Math.max(0, Math.floor(Number(row.nuevo_saldo) || 0));
+  entradaDescontadaConfirmada = true;
+  saveSecureBalance(nuevoSaldo);
+  console.log(`✅ Entrada de ${montoEntrada} VES descontada con RPC. Nuevo saldo: ${nuevoSaldo}`);
+  return true;
 }
 
 const mouse = { x: canvas.width / 2, y: canvas.height / 2 };
@@ -193,7 +195,7 @@ window.addEventListener('mousemove', (e) => {
 window.addEventListener('touchmove', (e) => {
   if (e.touches.length > 0) {
     for (let i = 0; i < e.touches.length; i++) {
-      let t = e.touches[i];
+      const t = e.touches[i];
       if (isSpectator || t.clientX >= window.innerWidth / 2) {
         mouse.x = t.clientX;
         mouse.y = t.clientY;
@@ -224,13 +226,13 @@ if (boostBtn && !isSpectator) {
 // ==========================================
 let gameRoom = null;
 const myPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
-let remotePlayers = {}; 
-let sharedLootOrbs = []; 
+let remotePlayers = {};
+let sharedLootOrbs = [];
 
 let mapaComidaActiva = true;
 let cantidadComidaConfig = 150;
 let valorComidaConfig = 10.00;
-let arenaFoodOrbs = []; 
+let arenaFoodOrbs = [];
 
 const FOOD_COLORS = ['#38bdf8', '#4ade80', '#facc15', '#f97316', '#e879f9', '#f43f5e', '#2dd4bf'];
 const FOOD_RADIUS = 3.5;
@@ -247,12 +249,39 @@ function appendLootOrbsWithLimit(newOrbs) {
   }
 }
 
+function buildSampledBody(bodySegments, maxSamples = 55) {
+  if (!Array.isArray(bodySegments) || bodySegments.length === 0) return [];
+  if (bodySegments.length <= maxSamples) {
+    return bodySegments.map(seg => ({
+      x: Number(seg.x.toFixed(1)),
+      y: Number(seg.y.toFixed(1))
+    }));
+  }
+
+  const sampled = [];
+  const step = (bodySegments.length - 1) / (maxSamples - 1);
+  for (let i = 0; i < maxSamples; i++) {
+    const idx = Math.min(bodySegments.length - 1, Math.round(i * step));
+    const seg = bodySegments[idx];
+    sampled.push({
+      x: Number(seg.x.toFixed(1)),
+      y: Number(seg.y.toFixed(1))
+    });
+  }
+  return sampled;
+}
+
 const roomChannelName = `arena_ves_${selectedEntryFee}`;
 
 let socket = null;
 if (typeof io !== 'undefined') {
-  socket = io('https://gusano-royale.onrender.com');
-  
+  socket = io('https://gusano-royale.onrender.com', {
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000
+  });
+
   socket.on('connect', () => {
     console.log('¡Conectado al servidor de Render con éxito!');
   });
@@ -271,7 +300,7 @@ async function verificarYCargarComida() {
         mapaComidaActiva = (item.valor === 'true' || item.valor === true);
       }
       if (item.clave === 'cantidad_comida') {
-        cantidadComidaConfig = parseInt(item.valor) || 150;
+        cantidadComidaConfig = parseInt(item.valor, 10) || 150;
       }
       if (item.clave === 'valor_comida_ves') {
         valorComidaConfig = parseFloat(item.valor) || 10.00;
@@ -312,7 +341,7 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
           targetBody: payload.body
         };
       } else {
-        let p = remotePlayers[payload.id];
+        const p = remotePlayers[payload.id];
         p.targetX = payload.x;
         p.targetY = payload.y;
         p.targetAngle = payload.angle;
@@ -373,7 +402,7 @@ let player = {
   radius: 12,
   body: [],
   length: 20,
-  ves: isSpectator ? 0 : selectedEntryFee, 
+  ves: isSpectator ? 0 : selectedEntryFee,
   skinId: selectedSkin,
   color: selectedColor,
   alive: !isSpectator
@@ -435,7 +464,7 @@ function dropLootOnDeath(x, y, totalVes, bodySegments = []) {
 
 let lastSendTime = 0;
 
-function updateLocalPlayer() {
+function updateLocalPlayer(dtFactor = 1) {
   if (isSpectator || !player.alive) return;
 
   player.radius = 10 + Math.min(20, Math.sqrt(player.ves) * 0.25);
@@ -445,7 +474,7 @@ function updateLocalPlayer() {
 
   if (isBoosting && player.ves > (selectedEntryFee * 0.1)) {
     currentSpeed = 4.6;
-    player.ves -= (selectedEntryFee * 0.0005);
+    player.ves = Math.max(0, player.ves - (selectedEntryFee * 0.0005) * dtFactor);
   }
 
   let targetAngle = player.angle;
@@ -460,10 +489,11 @@ function updateLocalPlayer() {
   let diff = targetAngle - player.angle;
   while (diff < -Math.PI) diff += Math.PI * 2;
   while (diff > Math.PI) diff -= Math.PI * 2;
-  player.angle += diff * 0.15;
+  const turnSmooth = Math.min(1, 0.18 * dtFactor);
+  player.angle += diff * turnSmooth;
 
-  player.x += Math.cos(player.angle) * currentSpeed;
-  player.y += Math.sin(player.angle) * currentSpeed;
+  player.x += Math.cos(player.angle) * currentSpeed * dtFactor;
+  player.y += Math.sin(player.angle) * currentSpeed * dtFactor;
 
   const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
   if (currentPhase === 'PREPARATION') {
@@ -488,7 +518,7 @@ function updateLocalPlayer() {
 
       if (Math.abs(dx) < 30 && Math.abs(dy) < 30) {
         if (Math.hypot(dx, dy) < player.radius + food.radius + 4) {
-          player.ves += food.ves; 
+          player.ves += food.ves;
 
           food.x = Math.random() * (mapSizeSafe - 200) + 100;
           food.y = Math.random() * (mapSizeSafe - 200) + 100;
@@ -524,7 +554,7 @@ function updateLocalPlayer() {
 
   if (gameRoom && gameActive) {
     const now = Date.now();
-    if (now - lastSendTime > 90) {
+    if (now - lastSendTime > 80) {
       lastSendTime = now;
       gameRoom.send({
         type: 'broadcast',
@@ -539,7 +569,7 @@ function updateLocalPlayer() {
           ves: Math.floor(player.ves),
           skinId: player.skinId,
           color: player.color,
-          body: player.body.slice(0, 12)
+          body: buildSampledBody(player.body, 55)
         }
       });
     }
@@ -549,7 +579,7 @@ function updateLocalPlayer() {
 // ==========================================
 // 4. RENDERIZADO Y LÍNEA CONTINUA (FLUIDO / TIPO SEDA)
 // ==========================================
-function drawPlayer(p, camera, isLocal) {
+function drawPlayer(p, camera, isLocal, dtFactor = 1) {
   if (!isLocal) {
     if (p.targetX !== undefined && p.targetY !== undefined) {
       if (p.x === undefined || p.y === undefined) {
@@ -563,29 +593,31 @@ function drawPlayer(p, camera, isLocal) {
         } else {
           const spd = p.currentSpeed || 2.6;
           if (p.targetAngle !== undefined) {
-            p.x += Math.cos(p.targetAngle) * spd;
-            p.y += Math.sin(p.targetAngle) * spd;
-            p.targetX += Math.cos(p.targetAngle) * spd;
-            p.targetY += Math.sin(p.targetAngle) * spd;
+            p.x += Math.cos(p.targetAngle) * spd * dtFactor;
+            p.y += Math.sin(p.targetAngle) * spd * dtFactor;
+            p.targetX += Math.cos(p.targetAngle) * spd * dtFactor;
+            p.targetY += Math.sin(p.targetAngle) * spd * dtFactor;
           }
-          p.x += (p.targetX - p.x) * 0.18;
-          p.y += (p.targetY - p.y) * 0.18;
+          const lerpFactor = Math.min(1, 0.24 * dtFactor);
+          p.x += (p.targetX - p.x) * lerpFactor;
+          p.y += (p.targetY - p.y) * lerpFactor;
         }
       }
     }
 
-    if (p.targetBody && Array.isArray(p.targetBody)) {
+    if (p.targetBody && Array.isArray(p.targetBody) && p.targetBody.length > 0) {
       if (!p.body || p.body.length !== p.targetBody.length) {
         p.body = p.targetBody.map(seg => ({ x: seg.x, y: seg.y }));
       } else {
         p.body[0].x = p.x;
         p.body[0].y = p.y;
+        const bodyLerp = Math.min(1, 0.45 * dtFactor);
         for (let i = 1; i < p.body.length; i++) {
           const prev = p.body[i - 1];
           const curr = p.body[i];
           const targetSeg = p.targetBody[i];
-          curr.x += ((prev.x + targetSeg.x) * 0.5 - curr.x) * 0.35;
-          curr.y += ((prev.y + targetSeg.y) * 0.5 - curr.y) * 0.35;
+          curr.x += ((prev.x + targetSeg.x) * 0.5 - curr.x) * bodyLerp;
+          curr.y += ((prev.y + targetSeg.y) * 0.5 - curr.y) * bodyLerp;
         }
       }
     }
@@ -646,7 +678,7 @@ function drawPlayer(p, camera, isLocal) {
 // FUNCIÓN: TABLA DE POSICIONES (LEADERBOARD)
 // ==========================================
 function drawLeaderboard() {
-  let allPlayers = [];
+  const allPlayers = [];
   if (!isSpectator && player.alive) {
     allPlayers.push({ name: player.name, ves: player.ves, isLocal: true });
   }
@@ -685,7 +717,7 @@ function drawLeaderboard() {
 
     ctx.fillStyle = p.isLocal ? '#4ade80' : '#ffffff';
     ctx.fillText(`${i + 1}. ${p.name.substring(0, 10)}`, startX + 12, yPos);
-    
+
     ctx.textAlign = 'right';
     ctx.fillStyle = '#eab308';
     ctx.fillText(`${Math.floor(p.ves)} VES`, startX + width - 12, yPos);
@@ -759,7 +791,7 @@ function updateHUD(observedPlayer) {
   const aliveDisplay = document.getElementById('alive-display');
   const timerDisplay = document.getElementById('timer-display');
   const badge = document.getElementById('spectator-badge');
-  
+
   const totalConnected = Object.keys(remotePlayers).length + ((!isSpectator && player.alive) ? 1 : 0);
 
   if (isSpectator) {
@@ -801,7 +833,7 @@ function startTimer() {
     if (timeLeft <= 0) {
       if (currentPhase === 'PREPARATION') {
         currentPhase = 'COMBAT';
-        timeLeft = COMBAT_TIME;      
+        timeLeft = COMBAT_TIME;
       } else {
         if (isSpectator) {
           currentPhase = 'PREPARATION';
@@ -815,107 +847,112 @@ function startTimer() {
 }
 
 let lastTime = 0;
-const fpsInterval = 1000 / 60;
+
+function renderArenaFrame(dtFactor = 1) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!player.alive && !isSpectator) return;
+
+  if (gameActive) {
+    if (!isSpectator) {
+      updateLocalPlayer(dtFactor);
+    }
+    checkRealPlayerCollisions();
+    checkWallCollisions();
+  }
+
+  const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
+  const camera = { x: 0, y: 0 };
+  let observedPlayer = null;
+
+  if (isSpectator) {
+    const remoteList = Object.values(remotePlayers);
+    if (remoteList.length > 0) {
+      if (spectateIndex >= remoteList.length) spectateIndex = 0;
+      observedPlayer = remoteList[spectateIndex];
+      freeCamPos.x = observedPlayer.x || mapSizeSafe / 2;
+      freeCamPos.y = observedPlayer.y || mapSizeSafe / 2;
+    } else {
+      const dx = mouse.x - canvas.width / 2;
+      const dy = mouse.y - canvas.height / 2;
+      if (Math.hypot(dx, dy) > 40) {
+        const angle = Math.atan2(dy, dx);
+        freeCamPos.x = Math.max(0, Math.min(mapSizeSafe, freeCamPos.x + Math.cos(angle) * 5 * dtFactor));
+        freeCamPos.y = Math.max(0, Math.min(mapSizeSafe, freeCamPos.y + Math.sin(angle) * 5 * dtFactor));
+      }
+    }
+    camera.x = freeCamPos.x - canvas.width / 2;
+    camera.y = freeCamPos.y - canvas.height / 2;
+  } else {
+    camera.x = player.x - canvas.width / 2;
+    camera.y = player.y - canvas.height / 2;
+  }
+
+  // Cuadrícula de fondo
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+  ctx.lineWidth = 1;
+  for (let x = -camera.x % 120; x < canvas.width; x += 120) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = -camera.y % 120; y < canvas.height; y += 120) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+
+  // Línea delimitadora del mapa (azul en preparación, roja al iniciar combate)
+  const mapScreenX = 0 - camera.x;
+  const mapScreenY = 0 - camera.y;
+
+  ctx.strokeStyle = currentPhase === 'COMBAT' ? '#ef4444' : '#38bdf8';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(mapScreenX, mapScreenY, mapSizeSafe, mapSizeSafe);
+
+  if (mapaComidaActiva) {
+    arenaFoodOrbs.forEach(food => {
+      const sx = food.x - camera.x;
+      const sy = food.y - camera.y;
+      if (sx >= -20 && sx <= canvas.width + 20 && sy >= -20 && sy <= canvas.height + 20) {
+        ctx.beginPath();
+        ctx.arc(sx, sy, food.radius || FOOD_RADIUS, 0, Math.PI * 2);
+        ctx.fillStyle = food.color || '#38bdf8';
+        ctx.fill();
+      }
+    });
+  }
+
+  // Dibujar botín soltado al morir
+  sharedLootOrbs.forEach(orb => {
+    const sx = orb.x - camera.x;
+    const sy = orb.y - camera.y;
+    const r = orb.radius || 7;
+    if (sx >= -30 && sx <= canvas.width + 30 && sy >= -30 && sy <= canvas.height + 30) {
+      ctx.beginPath();
+      ctx.arc(sx, sy, r, 0, Math.PI * 2);
+      ctx.fillStyle = orb.color || '#facc15';
+      ctx.fill();
+    }
+  });
+
+  Object.values(remotePlayers).forEach(friend => drawPlayer(friend, camera, false, dtFactor));
+
+  if (!isSpectator) {
+    drawPlayer(player, camera, true, dtFactor);
+  }
+
+  drawLeaderboard();
+  updateHUD(observedPlayer);
+}
 
 function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
 
   if (!lastTime) lastTime = timestamp;
-  let elapsed = timestamp - lastTime;
+  const rawElapsed = timestamp - lastTime;
+  lastTime = timestamp;
 
-  if (elapsed >= fpsInterval) {
-    lastTime = timestamp - (elapsed % fpsInterval);
+  const dtFactor = Math.min(2.5, Math.max(0.2, rawElapsed / (1000 / 60)));
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (gameActive && (player.alive || isSpectator)) {
-      if (!isSpectator) {
-        updateLocalPlayer();
-      }
-      checkRealPlayerCollisions();
-      checkWallCollisions();
-
-      const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
-      let camera = { x: 0, y: 0 };
-      let observedPlayer = null;
-
-      if (isSpectator) {
-        const remoteList = Object.values(remotePlayers);
-        if (remoteList.length > 0) {
-          if (spectateIndex >= remoteList.length) spectateIndex = 0;
-          observedPlayer = remoteList[spectateIndex];
-          freeCamPos.x = observedPlayer.x || mapSizeSafe / 2;
-          freeCamPos.y = observedPlayer.y || mapSizeSafe / 2;
-        } else {
-          const dx = mouse.x - canvas.width / 2;
-          const dy = mouse.y - canvas.height / 2;
-          if (Math.hypot(dx, dy) > 40) {
-            const angle = Math.atan2(dy, dx);
-            freeCamPos.x = Math.max(0, Math.min(mapSizeSafe, freeCamPos.x + Math.cos(angle) * 5));
-            freeCamPos.y = Math.max(0, Math.min(mapSizeSafe, freeCamPos.y + Math.sin(angle) * 5));
-          }
-        }
-        camera.x = freeCamPos.x - canvas.width / 2;
-        camera.y = freeCamPos.y - canvas.height / 2;
-      } else {
-        camera.x = player.x - canvas.width / 2;
-        camera.y = player.y - canvas.height / 2;
-      }
-
-      // Cuadrícula de fondo
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
-      ctx.lineWidth = 1;
-      for (let x = -camera.x % 120; x < canvas.width; x += 120) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-      }
-      for (let y = -camera.y % 120; y < canvas.height; y += 120) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-      }
-
-      // Línea delimitadora del mapa (azul en preparación, roja al iniciar combate)
-      const mapScreenX = 0 - camera.x;
-      const mapScreenY = 0 - camera.y;
-
-      ctx.strokeStyle = currentPhase === 'COMBAT' ? '#ef4444' : '#38bdf8';
-      ctx.lineWidth = 6;
-      ctx.strokeRect(mapScreenX, mapScreenY, mapSizeSafe, mapSizeSafe);
-
-      if (mapaComidaActiva) {
-        arenaFoodOrbs.forEach(food => {
-          const sx = food.x - camera.x;
-          const sy = food.y - camera.y;
-          if (sx >= -20 && sx <= canvas.width + 20 && sy >= -20 && sy <= canvas.height + 20) {
-            ctx.beginPath();
-            ctx.arc(sx, sy, food.radius || FOOD_RADIUS, 0, Math.PI * 2);
-            ctx.fillStyle = food.color || '#38bdf8';
-            ctx.fill();
-          }
-        });
-      }
-
-      // Dibujar botín soltado al morir
-      sharedLootOrbs.forEach(orb => {
-        const sx = orb.x - camera.x;
-        const sy = orb.y - camera.y;
-        const r = orb.radius || 7;
-        if (sx >= -30 && sx <= canvas.width + 30 && sy >= -30 && sy <= canvas.height + 30) {
-          ctx.beginPath();
-          ctx.arc(sx, sy, r, 0, Math.PI * 2);
-          ctx.fillStyle = orb.color || '#facc15';
-          ctx.fill();
-        }
-      });
-
-      Object.values(remotePlayers).forEach(friend => drawPlayer(friend, camera, false));
-      
-      if (!isSpectator) {
-        drawPlayer(player, camera, true);
-      }
-
-      drawLeaderboard();
-
-      updateHUD(observedPlayer);
-    }
+  if (gameActive) {
+    renderArenaFrame(dtFactor);
   }
 }
 
@@ -951,7 +988,7 @@ function mostrarPantallaCargaSala(titulo = 'Preparando Arena', subtitulo = 'Veri
       ${subtitulo}
     </p>
     <div style="width: 100%; max-width: 340px; height: 14px; background: #1e293b; border-radius: 999px; overflow: hidden; border: 1px solid #334155;">
-      <div id="loading-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #22c55e, #38bdf8); transition: width 0.25s ease;"></div>
+      <div id="loading-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #22c55e, #38bdf8); transition: width 0.2s ease;"></div>
     </div>
     <span id="loading-percent-text" style="margin-top: 10px; font-size: 13px; font-weight: bold; color: #4ade80;">0%</span>
   `;
@@ -977,14 +1014,14 @@ async function salirAlMenuConCarga(urlDestino = 'dashboard.html') {
     'Sincronizando tu saldo con el dashboard...'
   );
 
-  actualizarProgresoCarga(20, 'Confirmando actualización de saldo en Supabase...');
+  actualizarProgresoCarga(25, 'Confirmando actualización de saldo...');
   try {
     await promesaGuardadoFinal;
   } catch (e) {
     console.warn('Aviso al esperar guardado:', e);
   }
 
-  actualizarProgresoCarga(55, 'Cerrando conexión con la sala...');
+  actualizarProgresoCarga(65, 'Cerrando conexión con la sala...');
   if (gameRoom && typeof supabaseClient !== 'undefined' && supabaseClient) {
     try {
       await supabaseClient.removeChannel(gameRoom);
@@ -997,12 +1034,8 @@ async function salirAlMenuConCarga(urlDestino = 'dashboard.html') {
     } catch (e) {}
   }
 
-  await new Promise(resolve => setTimeout(resolve, 500));
-  actualizarProgresoCarga(85, 'Actualizando datos del dashboard...');
-  await new Promise(resolve => setTimeout(resolve, 500));
   actualizarProgresoCarga(100, '¡Listo! Volviendo al dashboard...');
-
-  await new Promise(resolve => setTimeout(resolve, 250));
+  await new Promise(resolve => setTimeout(resolve, 150));
   window.location.href = urlDestino;
 }
 window.salirAlMenuConCarga = salirAlMenuConCarga;
@@ -1036,24 +1069,27 @@ async function iniciarSalaConCarga() {
     'Verificando saldo y conectando con la sala...'
   );
 
-  actualizarProgresoCarga(15, 'Descontando entrada y verificando saldo...');
-  await descontarEntradaEnSupabase();
+  actualizarProgresoCarga(20, 'Descontando entrada y verificando saldo...');
+  const cobroOk = await descontarEntradaEnSupabase();
+  if (!isSpectator && !cobroOk) {
+    actualizarProgresoCarga(100, 'No se pudo confirmar la entrada. Volviendo al menú...');
+    await new Promise(resolve => setTimeout(resolve, 900));
+    window.location.href = 'dashboard.html';
+    return;
+  }
 
-  actualizarProgresoCarga(50, 'Cargando mapa y configuración global...');
+  actualizarProgresoCarga(55, 'Cargando mapa y configuración global...');
   await cargarTamanoMapaGlobal();
 
-  actualizarProgresoCarga(75, 'Sincronizando comida y sala...');
+  actualizarProgresoCarga(85, 'Sincronizando comida y sala...');
   await verificarYCargarComida();
 
-  await new Promise(resolve => setTimeout(resolve, 600));
-  actualizarProgresoCarga(90, '¡Casi listo! Entrando a la arena...');
-  await new Promise(resolve => setTimeout(resolve, 600));
   actualizarProgresoCarga(100, '¡A jugar!');
-
-  await new Promise(resolve => setTimeout(resolve, 250));
+  await new Promise(resolve => setTimeout(resolve, 180));
   overlay.remove();
 
   gameActive = true;
+  lastTime = performance.now();
   const skinBtnInit = document.getElementById('skin-btn');
   if (skinBtnInit && !isSpectator) skinBtnInit.style.display = 'block';
 
@@ -1065,14 +1101,15 @@ async function iniciarSalaConCarga() {
 iniciarSalaConCarga();
 
 // ==========================================
-// FUNCIÓN ENDGAME OPTIMIZADA PARA GUARDAR EL PREMIO
+// FUNCIÓN ENDGAME ATÓMICA PARA GUARDAR EL PREMIO (RPC)
 // ==========================================
 let partidaFinalizada = false;
 
-async function endGame(survived, reason) {
+function endGame(survived, reason) {
   if (isSpectator || partidaFinalizada) return;
   partidaFinalizada = true;
 
+  renderArenaFrame(1);
   gameActive = false;
   clearInterval(timerInterval);
 
@@ -1081,10 +1118,9 @@ async function endGame(survived, reason) {
   const endDesc = document.getElementById('end-desc');
   const endVes = document.getElementById('end-ves-amount');
 
-  if (endModal) endModal.style.display = 'flex';
-  activarBarraSalidaEnModalFin();
-
-  const finalAmount = survived ? Math.max(0, Math.floor(Number(player.ves) || 0)) : 0;
+  const finalAmount = (survived && entradaDescontadaConfirmada && !yaSeCobroPartida(currentMatchId))
+    ? Math.max(0, Math.floor(Number(player.ves) || 0))
+    : 0;
 
   if (survived) {
     if (endTitle) {
@@ -1102,51 +1138,40 @@ async function endGame(survived, reason) {
     if (endVes) endVes.innerText = '0 VES';
   }
 
-  if (survived && finalAmount > 0) {
+  if (endModal) endModal.style.display = 'flex';
+  activarBarraSalidaEnModalFin();
+
+  if (survived && finalAmount > 0 && !premioAcreditadoConfirmado) {
+    marcarPartidaCobrada(currentMatchId);
+
     promesaGuardadoFinal = (async () => {
       if (typeof supabaseClient === 'undefined' || !supabaseClient) {
-        saveSecureBalance(getSecureBalance() + finalAmount);
+        console.warn('⚠️ Sin cliente Supabase para acreditar premio de forma segura.');
         return;
       }
 
       const userId = localStorage.getItem('user_id');
-      const userEmail = localStorage.getItem('user_email');
-      if (!userId && !userEmail) {
-        saveSecureBalance(getSecureBalance() + finalAmount);
+      if (!userId) {
+        console.warn('⚠️ Falta user_id para acreditar premio de forma segura.');
         return;
       }
 
-      let query = supabaseClient.from('profiles').select('id, balance');
-      if (userId) {
-        query = query.eq('id', userId);
-      } else {
-        query = query.eq('email', userEmail);
+      const { data, error } = await supabaseClient.rpc('ajustar_saldo_seguro', {
+        p_user_id: userId,
+        p_delta: finalAmount
+      });
+
+      const row = Array.isArray(data) ? data[0] : data;
+
+      if (error || !row || !row.ok) {
+        console.error('❌ Error al acreditar ganancia con RPC:', error?.message || row?.mensaje);
+        return;
       }
 
-      const { data: profile, error: errFetch } = await query.maybeSingle();
-
-      if (!errFetch && profile) {
-        const balanceActualServidor = Number(profile.balance || 0);
-        const nuevoBalanceServidor = Math.max(0, Math.floor(balanceActualServidor + finalAmount));
-
-        const { error: errUpdate } = await supabaseClient
-          .from('profiles')
-          .update({ balance: nuevoBalanceServidor })
-          .eq('id', profile.id);
-
-        if (errUpdate) {
-          console.error('❌ Error de Supabase al sumar la ganancia:', errUpdate.message);
-          saveSecureBalance(getSecureBalance() + finalAmount);
-        } else {
-          saveSecureBalance(nuevoBalanceServidor);
-          console.log('✅ ¡Ganancia de', finalAmount, 'VES sumada! Nuevo saldo:', nuevoBalanceServidor);
-        }
-      } else {
-        console.error('❌ No se pudo encontrar el perfil en Supabase para actualizar el premio.');
-        saveSecureBalance(getSecureBalance() + finalAmount);
-      }
+      premioAcreditadoConfirmado = true;
+      const nuevoSaldo = Math.max(0, Math.floor(Number(row.nuevo_saldo) || 0));
+      saveSecureBalance(nuevoSaldo);
+      console.log('✅ ¡Ganancia de', finalAmount, 'VES sumada con RPC! Nuevo saldo:', nuevoSaldo);
     })();
-
-    await promesaGuardadoFinal;
   }
 }

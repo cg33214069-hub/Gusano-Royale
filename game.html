@@ -204,11 +204,7 @@
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // Servidor local en tu PC (cámbialo a tu IP local si pruebas desde otro dispositivo en tu red)
-  const GAME_SERVER_URL = 'http://localhost:3000';
-  window.gameSocket = io(GAME_SERVER_URL, {
-    transports: ['websocket', 'polling']
-  });
+  
 
   // --- CONFIGURACIÓN DE MODO ESPECTADOR EXCLUSIVO PARA ADMIN ---
   const urlParams = new URLSearchParams(window.location.search);
