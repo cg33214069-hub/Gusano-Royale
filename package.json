@@ -12,8 +12,19 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.2",
     "cors": "^2.8.6",
+    "dotenv": "^18.0.10",
     "express": "^5.3.0",
-    "socket.io": "^4.8.4"
-  }
+    "socket.io": "^4.8.4",
+    "ws": "^8.23.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cg33214069-hub/Gusano-Royale.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cg33214069-hub/Gusano-Royale/issues"
+  },
+  "homepage": "https://github.com/cg33214069-hub/Gusano-Royale#readme"
 }
