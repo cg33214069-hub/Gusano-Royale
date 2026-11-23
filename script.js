@@ -275,7 +275,7 @@ const roomChannelName = `arena_ves_${selectedEntryFee}`;
 
 let socket = null;
 if (typeof io !== 'undefined') {
-  socket = io('https://gusano-royale.onrender.com', {
+  socket = io('https://gusano-royale-1.onrender.com', {
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionAttempts: 10,
