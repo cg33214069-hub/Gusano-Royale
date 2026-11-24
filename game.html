@@ -199,12 +199,38 @@
 </div>
 
 <script>
+  // --- BLOQUEO DE TECLAS DE CONSOLA / INSPECTOR Y CLIC DERECHO ---
+  document.addEventListener('keydown', function(e) {
+    const key = (e.key || '').toUpperCase();
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+
+    if (key === 'F12') {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+    if ((isCtrlOrCmd && e.shiftKey && ['I', 'J', 'C', 'K'].includes(key)) ||
+        (e.metaKey && e.altKey && ['I', 'J', 'C', 'K', 'U'].includes(key))) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+    if (isCtrlOrCmd && ['U', 'S'].includes(key)) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+  }, true);
+
+  document.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    return false;
+  }, true);
+
   // Inicialización del cliente Supabase y Socket.io
   const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  
 
   // --- CONFIGURACIÓN DE MODO ESPECTADOR EXCLUSIVO PARA ADMIN ---
   const urlParams = new URLSearchParams(window.location.search);

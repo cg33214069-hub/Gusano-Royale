@@ -26,7 +26,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Inter, sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Inter, sans-serif; user-select: none; -webkit-user-select: none; }
+    input, textarea, select { user-select: text; -webkit-user-select: text; }
     body { background-color: #030712; color: #f3f4f6; min-height: 100vh; padding: 24px; }
     
     .admin-container { max-width: 1100px; margin: 0 auto; }
@@ -333,22 +334,22 @@
       </div>
     </div>       
 
-     <div style="background: #0f172a; padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); max-width: 450px; margin: 20px 0;">
-  <h3 style="color: #38bdf8; margin-top: 0;">🗺️ Control Global del Mapa</h3>
-  <p style="color: #94a3b8; font-size: 0.85rem;">Un clic cambia el tamaño para todas las salas:</p>
-  
-  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-    <button onclick="actualizarMapaGlobal(1200)" style="background: #38bdf8; color: #000; font-weight: bold; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;">
-      Pequeño (1200px)
-    </button>
-    <button onclick="actualizarMapaGlobal(2500)" style="background: #22c55e; color: #fff; font-weight: bold; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;">
-      Mediano (2500px)
-    </button>
-    <button onclick="actualizarMapaGlobal(4000)" style="background: #ef4444; color: #fff; font-weight: bold; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;">
-      Grande (4000px)
-    </button>
-  </div>
-</div> 
+    <div style="background: #0f172a; padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); max-width: 450px; margin: 20px 0;">
+      <h3 style="color: #38bdf8; margin-top: 0;">🗺️ Control Global del Mapa</h3>
+      <p style="color: #94a3b8; font-size: 0.85rem;">Un clic cambia el tamaño para todas las salas:</p>
+      
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button onclick="actualizarMapaGlobal(1200)" style="background: #38bdf8; color: #000; font-weight: bold; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;">
+          Pequeño (1200px)
+        </button>
+        <button onclick="actualizarMapaGlobal(2500)" style="background: #22c55e; color: #fff; font-weight: bold; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;">
+          Mediano (2500px)
+        </button>
+        <button onclick="actualizarMapaGlobal(4000)" style="background: #ef4444; color: #fff; font-weight: bold; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;">
+          Grande (4000px)
+        </button>
+      </div>
+    </div> 
 
     <!-- TARJETAS DE MÉTRICAS FINANCIERAS -->
     <div class="metrics-grid">
@@ -367,32 +368,27 @@
     </div>
 
     <div class="stat-card" style="background: #1e293b; padding: 20px; border-radius: 12px; color: #fff; text-align: center; margin-bottom: 20px;">
-  <h3 style="color: #38bdf8; font-size: 1.1rem; margin-bottom: 8px;">💰 Dinero Total en la Plataforma</h3>
-  <p id="total-platform-money" style="font-size: 28px; font-weight: bold; color: #38bdf8;">Calculando...</p>
-</div>
+      <h3 style="color: #38bdf8; font-size: 1.1rem; margin-bottom: 8px;">💰 Dinero Total en la Plataforma</h3>
+      <p id="total-platform-money" style="font-size: 28px; font-weight: bold; color: #38bdf8;">Calculando...</p>
+    </div>
 
-<div style="background: rgba(15, 23, 42, 0.9); border: 1px solid #38bdf8; border-radius: 14px; padding: 18px; margin-top: 20px;">
-  <h3 style="color: #38bdf8; margin-bottom: 12px; font-size: 1rem;">👁️ Monitoreo en Vivo (Solo Admin)</h3>
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
-    <button onclick="verSalaAdmin('sala-1')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #fff; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Sala Principiantes</button>
-    <button onclick="verSalaAdmin('sala-2')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #fff; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Sala Media</button>
-    <button onclick="verSalaAdmin('sala-3')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #fff; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Sala Profesional</button>
-    <button onclick="verSalaAdmin('sala-4')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #fff; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Sala VIP SBRk</button>
-  </div>
-</div>
+    <div style="background: rgba(15, 23, 42, 0.9); border: 1px solid #38bdf8; border-radius: 14px; padding: 18px; margin-top: 20px;">
+      <h3 style="color: #38bdf8; margin-bottom: 12px; font-size: 1rem;">👁️ Monitoreo en Vivo (Solo Admin)</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
+        <button onclick="verSalaAdmin('sala-1')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #fff; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Sala Principiantes</button>
+        <button onclick="verSalaAdmin('sala-2')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #fff; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Sala Media</button>
+        <button onclick="verSalaAdmin('sala-3')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #fff; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Sala Profesional</button>
+        <button onclick="verSalaAdmin('sala-4')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #fff; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer;">Sala VIP SBRk</button>
+      </div>
+    </div>
 
-<script>
-  function verSalaAdmin(roomId) {
-    window.location.href = `game.html?room=${roomId}&spectator=true`;
-  }
+    <script>
+      function verSalaAdmin(roomId) {
+        sessionStorage.setItem('gusanos_admin_auth', 'true');
+        window.location.href = `game.html?room=${roomId}&spectator=true`;
+      }
+    </script>
 
-  function verSalaAdmin(roomId) {
-  // Guardamos el pase de administrador antes de entrar a la arena
-  sessionStorage.setItem('gusanos_admin_auth', 'true');
-  window.location.href = `game.html?room=${roomId}&spectator=true`;
-}
-
-</script>
     <!-- BUSCADOR RÁPIDO DE USUARIOS Y SALDO -->
     <div class="search-box-card">
       <h2 style="font-size: 1rem; color: #38bdf8; text-transform: uppercase;">🔍 Búsqueda y Gestión Rápida de Saldo de Usuario</h2>
@@ -526,6 +522,34 @@
   </div>
 
   <script>
+    // --- BLOQUEO DE TECLAS DE CONSOLA / INSPECTOR Y CLIC DERECHO ---
+    document.addEventListener('keydown', function(e) {
+      const key = (e.key || '').toUpperCase();
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+
+      if (key === 'F12') {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      if ((isCtrlOrCmd && e.shiftKey && ['I', 'J', 'C', 'K'].includes(key)) ||
+          (e.metaKey && e.altKey && ['I', 'J', 'C', 'K', 'U'].includes(key))) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      if (isCtrlOrCmd && ['U', 'S'].includes(key)) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    }, true);
+
+    document.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      return false;
+    }, true);
+
     const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
     
@@ -659,16 +683,13 @@
         });
       }
 
-      // Actualizamos el contador total de la plataforma en vivo
       const totalPlatformElem = document.getElementById('total-platform-money');
       if (totalPlatformElem) {
         totalPlatformElem.innerText = `${dineroPlataformaTotal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES`;
       }
 
-      // --- CARGAR DEPÓSITOS PENDIENTES ---
       await cargarDepositosAdmin();
 
-      // --- CARGAR RETIROS ---
       const { data: withdrawals } = await supabaseClient
         .from('withdrawals')
         .select('*')
@@ -715,14 +736,12 @@
         withBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #64748b;">No hay solicitudes de retiro.</td></tr>`;
       }
 
-      // Actualizar métricas financieras
       const movingBalance = totalDeposited - totalWithdrawn;
       document.getElementById('metric-total-deposits').innerText = totalDeposited.toLocaleString('es-VE') + ' VES';
       document.getElementById('metric-total-withdrawals').innerText = totalWithdrawn.toLocaleString('es-VE') + ' VES';
       document.getElementById('metric-moving-balance').innerText = movingBalance.toLocaleString('es-VE') + ' VES';
     }
 
-    // --- CARGAR DEPÓSITOS PENDIENTES EN EL PANEL ---
     async function cargarDepositosAdmin() {
       const contenedorAdmin = document.getElementById('admin-deposits-container');
       if (!contenedorAdmin) return;
@@ -766,7 +785,6 @@
       }).join('');
     }
 
-    // --- FUNCIÓN PARA APROBAR DEPÓSITO, ACREDITAR SALDO Y ABRIR WHATSAPP CON FACTURA ---
     async function aprobarDeposito(depositId, userId, monto, referencia, emailUsuario) {
       if (!confirm(`¿Estás seguro de aprobar el depósito de ${Number(monto).toLocaleString('es-VE')} VES? Esto le sumará el saldo al usuario.`)) return;
 
@@ -812,7 +830,6 @@
       loadData();
     }
 
-    // --- FUNCIÓN PARA RECHAZAR DEPÓSITO ---
     async function rechazarDeposito(depositId) {
       if (!confirm("¿Estás seguro de rechazar este depósito?")) return;
 
@@ -830,7 +847,6 @@
       loadData();
     }
 
-    // --- GESTIÓN DE RETIROS ---
     function openWithdrawalModal(id, userId, amount, account, phone) {
       activeWithdrawal = { id, userId, amount, account };
       document.getElementById('modal-user-display').innerText = userId;
@@ -912,7 +928,6 @@
       loadData();
     }
 
-    // --- BUSCADOR SEGURO DE USUARIOS EN SUPABASE ---
     async function searchUserBalance() {
       const query = document.getElementById('search-user-input').value.trim();
       if (!query) {

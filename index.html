@@ -20,6 +20,10 @@
       user-select: none;
       -webkit-user-select: none;
     }
+    input, textarea {
+      user-select: text;
+      -webkit-user-select: text;
+    }
     body {
       background-color: #090d16;
       color: #ffffff;
@@ -193,6 +197,34 @@
   </div>
 
   <script>
+    // --- BLOQUEO DE TECLAS DE CONSOLA / INSPECTOR Y CLIC DERECHO ---
+    document.addEventListener('keydown', function(e) {
+      const key = (e.key || '').toUpperCase();
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+
+      if (key === 'F12') {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      if ((isCtrlOrCmd && e.shiftKey && ['I', 'J', 'C', 'K'].includes(key)) ||
+          (e.metaKey && e.altKey && ['I', 'J', 'C', 'K', 'U'].includes(key))) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      if (isCtrlOrCmd && ['U', 'S'].includes(key)) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    }, true);
+
+    document.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      return false;
+    }, true);
+
     // Registro de Service Worker para PWA (Limpia la caché vieja y conecta Supabase)
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
