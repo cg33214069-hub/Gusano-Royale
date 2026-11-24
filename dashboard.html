@@ -20,6 +20,13 @@
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    input, select, textarea {
+      user-select: text;
+      -webkit-user-select: text;
     }
 
     /* BARRA SUPERIOR / NAVBAR */
@@ -684,11 +691,17 @@
     <section id="view-withdraw" class="view-section">
       <div class="deposit-card">
         <h2 class="deposit-title">💸 MÓDULO DE RETIROS</h2>
-        <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px;">Selecciona tu cuenta bancaria guardada y solicita tu pago por Pago Móvil.</p>
+        <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px;">
+          Selecciona tu cuenta bancaria guardada y solicita tu pago por Pago Móvil.
+          <strong>Límites: Mín. 1.000 VES / Máx. 10.000 VES • Máximo 1 retiro cada 24 horas.</strong>
+        </p>
 
         <div class="input-group">
-          <label for="withdraw-amount">Monto a Retirar (VES)</label>
-          <input type="number" id="withdraw-amount" placeholder="Ej. 500">
+          <label for="withdraw-amount">Monto a Retirar (VES) — Mín. 1.000 / Máx. 10.000</label>
+          <input type="number" id="withdraw-amount" placeholder="Ej. 1000" min="1000" max="10000" step="any">
+          <small style="color: #94a3b8; font-size: 0.75rem; margin-top: 4px; display: block;">
+            Puedes solicitar desde 1.000 VES hasta 10.000 VES por solicitud (1 solicitud cada 24 horas).
+          </small>
         </div>
 
         <div class="input-group">
@@ -781,31 +794,44 @@
   </main>
 
   <script>
-    // --- ESCUDO ANTI-TRAMPAS PARA USUARIOS EN DASHBOARD ---
+    // --- BLOQUEO DE TECLAS DE CONSOLA / INSPECTOR Y CLIC DERECHO ---
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'F12') {
+      const key = (e.key || '').toUpperCase();
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+
+      if (key === 'F12') {
         e.preventDefault();
+        e.stopPropagation();
         return false;
       }
-      if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) {
+      if ((isCtrlOrCmd && e.shiftKey && ['I', 'J', 'C', 'K'].includes(key)) ||
+          (e.metaKey && e.altKey && ['I', 'J', 'C', 'K', 'U'].includes(key))) {
         e.preventDefault();
+        e.stopPropagation();
         return false;
       }
-      if (e.ctrlKey && e.key === 'u') {
+      if (isCtrlOrCmd && ['U', 'S'].includes(key)) {
         e.preventDefault();
+        e.stopPropagation();
         return false;
       }
-    });
+    }, true);
 
     document.addEventListener('contextmenu', function(e) {
       e.preventDefault();
-    });
+      return false;
+    }, true);
 
     const SUPABASE_URL = 'https://odecdkuwbkcvqekuekoc.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZWNka3V3YmtjdnFla3Vla29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMTQzNDIsImV4cCI6MjEwODg5MDM0Mn0.Hi8GemXv6_ZDyBTPwJVqwAABlQ24smArzNhATaRYs7A';
     
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let selectedPaymentMethod = 'pago_movil';
+
+    // --- REGLAS DE RETIRO (VES) ---
+    const MIN_RETIRO_VES = 1000;
+    const MAX_RETIRO_VES = 10000;
+    const HORAS_ENTRE_RETIROS = 24;
 
     // --- CONFIGURACIÓN DE TOKENS A BOLÍVARES (1.000 TOKENS = 1.000 VES) ---
     const TASA_TOKEN_A_VES = 1;
@@ -835,64 +861,61 @@
       }
     }
 
-   async function cargarDatosReferidosPerfil() {
-  const userId = localStorage.getItem('user_id');
-  const userEmail = localStorage.getItem('user_email');
-  if (!userId && !userEmail) return;
+    async function cargarDatosReferidosPerfil() {
+      const userId = localStorage.getItem('user_id');
+      const userEmail = localStorage.getItem('user_email');
+      if (!userId && !userEmail) return;
 
-  let query = supabaseClient
-    .from('profiles')
-    .select('id, balance, referral_code, referral_tokens');
+      let query = supabaseClient
+        .from('profiles')
+        .select('id, balance, referral_code, referral_tokens');
 
-  query = userId ? query.eq('id', userId) : query.eq('email', userEmail);
-  const { data: profile, error } = await query.maybeSingle();
+      query = userId ? query.eq('id', userId) : query.eq('email', userEmail);
+      const { data: profile, error } = await query.maybeSingle();
 
-  if (error || !profile) return;
+      if (error || !profile) return;
 
-  let codigo = (profile.referral_code || '').trim().toUpperCase();
-  if (!codigo) {
-    codigo = generarCodigoReferidoDashboard();
-    await supabaseClient
-      .from('profiles')
-      .update({ referral_code: codigo })
-      .eq('id', profile.id);
-  }
+      let codigo = (profile.referral_code || '').trim().toUpperCase();
+      if (!codigo) {
+        codigo = generarCodigoReferidoDashboard();
+        await supabaseClient
+          .from('profiles')
+          .update({ referral_code: codigo })
+          .eq('id', profile.id);
+      }
 
-  const tokens = Number(profile.referral_tokens || 0);
-  const equivalenteVes = tokens * TASA_TOKEN_A_VES;
+      const tokens = Number(profile.referral_tokens || 0);
+      const equivalenteVes = tokens * TASA_TOKEN_A_VES;
 
-  const codeEl = document.getElementById('profile-referral-code');
-  const tokensEl = document.getElementById('profile-referral-tokens');
-  const eqVesEl = document.getElementById('profile-tokens-ves');
-  const countEl = document.getElementById('profile-referral-count');
+      const codeEl = document.getElementById('profile-referral-code');
+      const tokensEl = document.getElementById('profile-referral-tokens');
+      const eqVesEl = document.getElementById('profile-tokens-ves');
+      const countEl = document.getElementById('profile-referral-count');
 
-  if (codeEl) codeEl.innerText = codigo;
-  if (tokensEl) tokensEl.innerText = tokens.toLocaleString('es-VE');
-  if (eqVesEl) {
-    eqVesEl.innerText = equivalenteVes.toLocaleString('es-VE', { minimumFractionDigits: 2 }) + ' VES';
-  }
+      if (codeEl) codeEl.innerText = codigo;
+      if (tokensEl) tokensEl.innerText = tokens.toLocaleString('es-VE');
+      if (eqVesEl) {
+        eqVesEl.innerText = equivalenteVes.toLocaleString('es-VE', { minimumFractionDigits: 2 }) + ' VES';
+      }
 
-  // Contar desde referral_signups
-  const { count: countSignups } = await supabaseClient
-    .from('referral_signups')
-    .select('*', { count: 'exact', head: true })
-    .eq('referrer_id', profile.id);
+      const { count: countSignups } = await supabaseClient
+        .from('referral_signups')
+        .select('*', { count: 'exact', head: true })
+        .eq('referrer_id', profile.id);
 
-  // Contar también desde profiles por referred_by como respaldo
-  const { count: countProfiles } = await supabaseClient
-    .from('profiles')
-    .select('*', { count: 'exact', head: true })
-    .eq('referred_by', codigo);
+      const { count: countProfiles } = await supabaseClient
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('referred_by', codigo);
 
-  let totalReferidos = Math.max(Number(countSignups || 0), Number(countProfiles || 0));
+      let totalReferidos = Math.max(Number(countSignups || 0), Number(countProfiles || 0));
 
-  // Si ya hay tokens acumulados pero los conteos dan 0, calcular al menos 1 si aplica
-  if (totalReferidos === 0 && tokens > 0) {
-    totalReferidos = Math.max(1, Math.floor(tokens / 100));
-  }
+      if (totalReferidos === 0 && tokens > 0) {
+        totalReferidos = Math.max(1, Math.floor(tokens / 100));
+      }
 
-  if (countEl) countEl.innerText = String(totalReferidos);
-}
+      if (countEl) countEl.innerText = String(totalReferidos);
+    }
 
     async function convertirTokensAVes() {
       const inputEl = document.getElementById('convert-tokens-input');
@@ -1276,17 +1299,68 @@
       alert("✅ ¡Datos bancarios guardados con éxito!");
     }
 
+    async function verificarLimiteDiarioRetiro(profileId) {
+      const { data: retiros, error } = await supabaseClient
+        .from('withdrawals')
+        .select('fecha, created_at, estado, status')
+        .eq('user_id', profileId)
+        .order('fecha', { ascending: false })
+        .limit(10);
+
+      if (error || !retiros || retiros.length === 0) {
+        return { permitido: true };
+      }
+
+      const ahoraMs = Date.now();
+      const ventanaMs = HORAS_ENTRE_RETIROS * 60 * 60 * 1000;
+
+      for (const r of retiros) {
+        const estadoRaw = String(r.estado || r.status || '').toLowerCase().trim();
+        if (estadoRaw === 'rechazado' || estadoRaw === 'cancelado' || estadoRaw === 'rejected' || estadoRaw === 'cancelled') {
+          continue;
+        }
+
+        const fechaStr = r.fecha || r.created_at;
+        if (!fechaStr) continue;
+
+        const fechaMs = new Date(fechaStr).getTime();
+        if (Number.isNaN(fechaMs)) continue;
+
+        const transcurridoMs = ahoraMs - fechaMs;
+        if (transcurridoMs >= 0 && transcurridoMs < ventanaMs) {
+          const restanteMs = ventanaMs - transcurridoMs;
+          const horasRestantes = Math.floor(restanteMs / (1000 * 60 * 60));
+          const minutosRestantes = Math.ceil((restanteMs % (1000 * 60 * 60)) / (1000 * 60));
+          return {
+            permitido: false,
+            horasRestantes,
+            minutosRestantes
+          };
+        }
+      }
+
+      return { permitido: true };
+    }
+
     async function submitWithdrawal() {
       const amountInput = document.getElementById('withdraw-amount').value;
       const selectElement = document.getElementById('saved-accounts-select').value;
       const amount = parseFloat(amountInput);
 
-      if (!amount || amount <= 0) {
-        alert("Por favor ingresa un monto válido a retirar.");
+      if (!amount || Number.isNaN(amount)) {
+        alert("⚠️ Por favor ingresa un monto válido a retirar.");
+        return;
+      }
+      if (amount < MIN_RETIRO_VES) {
+        alert(`⚠️ El monto mínimo de retiro es de ${MIN_RETIRO_VES.toLocaleString('es-VE')} VES.`);
+        return;
+      }
+      if (amount > MAX_RETIRO_VES) {
+        alert(`⚠️ El monto máximo por retiro es de ${MAX_RETIRO_VES.toLocaleString('es-VE')} VES.`);
         return;
       }
       if (!selectElement) {
-        alert("Por favor selecciona una cuenta bancaria guardada.");
+        alert("⚠️ Por favor selecciona una cuenta bancaria guardada.");
         return;
       }
 
@@ -1309,10 +1383,19 @@
         return;
       }
 
+      const chequeoDiario = await verificarLimiteDiarioRetiro(profile.id);
+      if (!chequeoDiario.permitido) {
+        alert(
+          `⚠️ Solo puedes solicitar 1 retiro cada 24 horas.\n\n` +
+          `Tiempo restante aproximado: ${chequeoDiario.horasRestantes}h ${chequeoDiario.minutosRestantes}m.`
+        );
+        return;
+      }
+
       const saldoActual = Number(profile.balance || 0);
 
       if (saldoActual < amount) {
-        alert("No tienes suficiente saldo disponible para este retiro.");
+        alert("❌ No tienes suficiente saldo disponible para este retiro.");
         return;
       }
 
