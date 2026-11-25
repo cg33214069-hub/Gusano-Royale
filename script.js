@@ -251,7 +251,7 @@ function appendLootOrbsWithLimit(newOrbs) {
   }
 }
 
-function buildSampledBody(bodySegments, maxSamples = 55) {
+function buildSampledBody(bodySegments, maxSamples = 30) {
   if (!Array.isArray(bodySegments) || bodySegments.length === 0) return [];
   if (bodySegments.length <= maxSamples) {
     return bodySegments.map(seg => ({
@@ -340,6 +340,7 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
           targetX: payload.x,
           targetY: payload.y,
           targetAngle: payload.angle,
+          renderAngle: payload.angle,
           currentSpeed: payload.speed || 1.9,
           targetBody: payload.body
         };
@@ -565,7 +566,7 @@ function updateLocalPlayer(dtFactor = 1) {
 
   if (gameRoom && gameActive) {
     const now = Date.now();
-    if (now - lastSendTime > 65) {
+    if (now - lastSendTime > 75) {
       lastSendTime = now;
       gameRoom.send({
         type: 'broadcast',
@@ -580,7 +581,7 @@ function updateLocalPlayer(dtFactor = 1) {
           ves: Math.floor(player.ves),
           skinId: player.skinId,
           color: player.color,
-          body: buildSampledBody(player.body, 55)
+          body: buildSampledBody(player.body, 30)
         }
       });
     }
@@ -592,32 +593,46 @@ function updateLocalPlayer(dtFactor = 1) {
 // ==========================================
 function drawPlayer(p, camera, isLocal, dtFactor = 1) {
   if (!isLocal) {
-    if (p.targetX !== undefined && p.targetY !== undefined) {
-      if (p.x === undefined || p.y === undefined) {
-        p.x = p.targetX;
-        p.y = p.targetY;
-      } else {
-        const dx = p.targetX - p.x;
-        const dy = p.targetY - p.y;
-        const dist = Math.hypot(dx, dy);
+    const spd = p.currentSpeed || 1.9;
 
-        if (dist > 300) {
-          p.x = p.targetX;
-          p.y = p.targetY;
-          if (Array.isArray(p.targetBody) && p.targetBody.length > 0) {
-            p.body = p.targetBody.map(seg => ({ x: seg.x, y: seg.y }));
-          }
-        } else if (dist > 0.1) {
-          const lerpFactor = Math.min(0.35, 0.18 * dtFactor);
-          p.x += dx * lerpFactor;
-          p.y += dy * lerpFactor;
-        }
-      }
+    if (p.x === undefined || p.y === undefined) {
+      p.x = p.targetX ?? 0;
+      p.y = p.targetY ?? 0;
+      p.renderAngle = p.targetAngle ?? 0;
+    }
+
+    if (p.renderAngle === undefined) {
+      p.renderAngle = p.targetAngle ?? 0;
+    }
+
+    if (p.targetAngle !== undefined) {
+      let aDiff = p.targetAngle - p.renderAngle;
+      while (aDiff < -Math.PI) aDiff += Math.PI * 2;
+      while (aDiff > Math.PI) aDiff -= Math.PI * 2;
+      p.renderAngle += aDiff * Math.min(1, 0.22 * dtFactor);
+    }
+
+    // Predicción continua por cuadro para evitar parones entre paquetes
+    p.x += Math.cos(p.renderAngle) * spd * dtFactor;
+    p.y += Math.sin(p.renderAngle) * spd * dtFactor;
+
+    if (p.targetX !== undefined && p.targetY !== undefined) {
+      const dx = p.targetX - p.x;
+      const dy = p.targetY - p.y;
+      const dist = Math.hypot(dx, dy);
+
+      // Corrección suave sin teletransportarse de golpe
+      const correctionFactor = dist > 220
+        ? Math.min(0.42, 0.25 * dtFactor)
+        : Math.min(0.24, 0.14 * dtFactor);
+
+      p.x += dx * correctionFactor;
+      p.y += dy * correctionFactor;
     }
 
     if (p.targetBody && Array.isArray(p.targetBody) && p.targetBody.length > 0) {
       if (!p.body || p.body.length === 0) {
-        p.body = p.targetBody.map(seg => ({ x: seg.x, y: seg.y }));
+        p.body = p.targetBody.map(seg => ({ x: p.x, y: p.y }));
       } else {
         while (p.body.length < p.targetBody.length) {
           const tail = p.body[p.body.length - 1] || { x: p.x, y: p.y };
@@ -630,12 +645,17 @@ function drawPlayer(p, camera, isLocal, dtFactor = 1) {
         p.body[0].x = p.x;
         p.body[0].y = p.y;
 
-        const bodyLerp = Math.min(0.42, 0.26 * dtFactor);
+        const bodyLerp = Math.min(0.32, 0.18 * dtFactor);
         for (let i = 1; i < p.body.length; i++) {
+          const prev = p.body[i - 1];
           const curr = p.body[i];
-          const targetSeg = p.targetBody[i] || p.body[i - 1];
-          curr.x += (targetSeg.x - curr.x) * bodyLerp;
-          curr.y += (targetSeg.y - curr.y) * bodyLerp;
+          const targetSeg = p.targetBody[i] || prev;
+
+          const desiredX = targetSeg.x * 0.65 + prev.x * 0.35;
+          const desiredY = targetSeg.y * 0.65 + prev.y * 0.35;
+
+          curr.x += (desiredX - curr.x) * bodyLerp;
+          curr.y += (desiredY - curr.y) * bodyLerp;
         }
       }
     }
@@ -746,7 +766,7 @@ function drawLeaderboard() {
 function cleanupInactiveRemotePlayers() {
   const now = Date.now();
   Object.keys(remotePlayers).forEach(id => {
-    if (now - remotePlayers[id].lastUpdate > 8500) {
+    if (now - remotePlayers[id].lastUpdate > 12000) {
       delete remotePlayers[id];
     }
   });
