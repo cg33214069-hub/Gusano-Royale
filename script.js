@@ -125,8 +125,10 @@ let selectedSkin = localStorage.getItem('selected_skin') || 've';
 let selectedColor = localStorage.getItem('worm_color') || '#22c55e';
 let playerName = localStorage.getItem('player_name') || 'Jugador';
 let gameActive = false;
+// Fases: 'PREPARATION' (10s) -> 'COMBAT' (60s) -> 'EXTRACTION_FREE' (raya verde, cronómetro hacia arriba)
 let currentPhase = 'PREPARATION';
 let timeLeft = PREPARATION_TIME;
+let elapsedAfterCombat = 0;
 let timerInterval = null;
 
 // Variables exclusivas para cámara de espectador
@@ -281,6 +283,7 @@ if (typeof io !== 'undefined') {
     reconnectionAttempts: 10,
     reconnectionDelay: 1000
   });
+  window.gameSocket = socket;
 
   socket.on('connect', () => {
     console.log('¡Conectado al servidor de Render con éxito!');
@@ -751,7 +754,8 @@ function cleanupInactiveRemotePlayers() {
 
 function checkRealPlayerCollisions() {
   cleanupInactiveRemotePlayers();
-  if (isSpectator || currentPhase !== 'COMBAT' || !player.alive) return;
+  if (isSpectator || !player.alive) return;
+  if (currentPhase !== 'COMBAT' && currentPhase !== 'EXTRACTION_FREE') return;
 
   const hitThreshold = player.radius + 7;
 
@@ -777,7 +781,8 @@ function checkRealPlayerCollisions() {
 }
 
 function checkWallCollisions() {
-  if (isSpectator || currentPhase !== 'COMBAT' || !player.alive) return;
+  if (isSpectator || !player.alive) return;
+  if (currentPhase !== 'COMBAT' && currentPhase !== 'EXTRACTION_FREE') return;
 
   const mapSizeSafe = typeof WORLD_SIZE === 'number' && WORLD_SIZE > 0 ? WORLD_SIZE : 2500;
   const hitLeft = player.x - player.radius <= 0;
@@ -786,6 +791,19 @@ function checkWallCollisions() {
   const hitBottom = player.y + player.radius >= mapSizeSafe;
 
   if (hitLeft || hitRight || hitTop || hitBottom) {
+    if (currentPhase === 'EXTRACTION_FREE') {
+      player.alive = false;
+      if (gameRoom) {
+        gameRoom.send({
+          type: 'broadcast',
+          event: 'player_died',
+          payload: { id: player.id }
+        });
+      }
+      endGame(true, '¡Saliste por la raya verde! Te llevas todo tu botín recolectado.');
+      return;
+    }
+
     player.alive = false;
     dropLootOnDeath(player.x, player.y, player.ves, player.body);
 
@@ -805,6 +823,7 @@ function updateHUD(observedPlayer) {
   const vesDisplay = document.getElementById('ves-display');
   const aliveDisplay = document.getElementById('alive-display');
   const timerDisplay = document.getElementById('timer-display');
+  const timerLabel = document.getElementById('timer-label');
   const badge = document.getElementById('spectator-badge');
 
   const totalConnected = Object.keys(remotePlayers).length + ((!isSpectator && player.alive) ? 1 : 0);
@@ -824,8 +843,15 @@ function updateHUD(observedPlayer) {
 
   if (aliveDisplay) aliveDisplay.innerText = `${totalConnected} Activos en la Sala`;
 
-  const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
-  const s = (timeLeft % 60).toString().padStart(2, '0');
+  if (timerLabel) {
+    timerLabel.innerText = currentPhase === 'EXTRACTION_FREE' ? 'Salida Verde' : 'Tiempo';
+  }
+
+  const secondsToShow = currentPhase === 'EXTRACTION_FREE'
+    ? elapsedAfterCombat
+    : Math.max(0, timeLeft);
+  const m = Math.floor(secondsToShow / 60).toString().padStart(2, '0');
+  const s = (secondsToShow % 60).toString().padStart(2, '0');
   if (timerDisplay) timerDisplay.innerText = `${m}:${s}`;
 }
 
@@ -833,6 +859,12 @@ function startTimer() {
   clearInterval(timerInterval);
   timerInterval = setInterval(() => {
     if (!gameActive) return;
+
+    if (currentPhase === 'EXTRACTION_FREE') {
+      elapsedAfterCombat++;
+      return;
+    }
+
     timeLeft--;
 
     const skinBtn = document.getElementById('skin-btn');
@@ -849,12 +881,14 @@ function startTimer() {
       if (currentPhase === 'PREPARATION') {
         currentPhase = 'COMBAT';
         timeLeft = COMBAT_TIME;
-      } else {
+      } else if (currentPhase === 'COMBAT') {
         if (isSpectator) {
           currentPhase = 'PREPARATION';
           timeLeft = PREPARATION_TIME;
         } else {
-          endGame(true, "¡Sobreviviste a la ronda! Te llevas todo tu botín recolectado.");
+          currentPhase = 'EXTRACTION_FREE';
+          timeLeft = 0;
+          elapsedAfterCombat = 0;
         }
       }
     }
@@ -913,11 +947,13 @@ function renderArenaFrame(dtFactor = 1) {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
   }
 
-  // Línea delimitadora del mapa (azul en preparación, roja al iniciar combate)
+  // Línea delimitadora del mapa (azul en preparación, roja en combate, verde al habilitar salida)
   const mapScreenX = 0 - camera.x;
   const mapScreenY = 0 - camera.y;
 
-  ctx.strokeStyle = currentPhase === 'COMBAT' ? '#ef4444' : '#38bdf8';
+  ctx.strokeStyle = currentPhase === 'EXTRACTION_FREE'
+    ? '#22c55e'
+    : (currentPhase === 'COMBAT' ? '#ef4444' : '#38bdf8');
   ctx.lineWidth = 6;
   ctx.strokeRect(mapScreenX, mapScreenY, mapSizeSafe, mapSizeSafe);
 
