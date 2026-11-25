@@ -74,7 +74,7 @@ function resetPlayerToCenter() {
     player.x = spawn.x;
     player.y = spawn.y;
     player.body = [];
-    const segCount = Math.max(5, player.length || 20);
+    const segCount = Math.max(5, Math.round(player.visualLength || player.length || 14));
     for (let i = 0; i < segCount; i++) {
       player.body.push({ x: player.x, y: player.y });
     }
@@ -330,14 +330,14 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
   });
 
   gameRoom.on('broadcast', { event: 'player_move' }, ({ payload }) => {
-    if (payload.id !== myPlayerId) {
+    if (payload && payload.id !== myPlayerId) {
       if (!remotePlayers[payload.id]) {
         remotePlayers[payload.id] = {
           ...payload,
           targetX: payload.x,
           targetY: payload.y,
           targetAngle: payload.angle,
-          currentSpeed: payload.speed || 2.6,
+          currentSpeed: payload.speed || 1.9,
           targetBody: payload.body
         };
       } else {
@@ -345,7 +345,7 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
         p.targetX = payload.x;
         p.targetY = payload.y;
         p.targetAngle = payload.angle;
-        p.currentSpeed = payload.speed || 2.6;
+        p.currentSpeed = payload.speed || 1.9;
         p.ves = payload.ves;
         p.skinId = payload.skinId;
         p.color = payload.color;
@@ -356,19 +356,21 @@ if (typeof supabaseClient !== 'undefined' && supabaseClient) {
   });
 
   gameRoom.on('broadcast', { event: 'player_died' }, ({ payload }) => {
-    if (remotePlayers[payload.id]) {
+    if (payload && remotePlayers[payload.id]) {
       delete remotePlayers[payload.id];
     }
   });
 
   gameRoom.on('broadcast', { event: 'spawn_loot_batch' }, ({ payload }) => {
-    if (Array.isArray(payload.orbs)) {
+    if (payload && Array.isArray(payload.orbs)) {
       appendLootOrbsWithLimit(payload.orbs);
     }
   });
 
   gameRoom.on('broadcast', { event: 'spawn_loot' }, ({ payload }) => {
-    appendLootOrbsWithLimit([payload]);
+    if (payload) {
+      appendLootOrbsWithLimit([payload]);
+    }
   });
 
   gameRoom.on('broadcast', { event: 'collect_loot' }, ({ payload }) => {
@@ -398,10 +400,11 @@ let player = {
   x: initialSpawn.x,
   y: initialSpawn.y,
   angle: 0,
-  speed: 2.6,
-  radius: 12,
+  speed: 1.9,
+  radius: 8,
   body: [],
-  length: 20,
+  length: 14,
+  visualLength: 14,
   ves: isSpectator ? 0 : selectedEntryFee,
   skinId: selectedSkin,
   color: selectedColor,
@@ -467,14 +470,19 @@ let lastSendTime = 0;
 function updateLocalPlayer(dtFactor = 1) {
   if (isSpectator || !player.alive) return;
 
-  player.radius = 10 + Math.min(20, Math.sqrt(player.ves) * 0.25);
-  player.length = Math.floor(15 + player.ves / (selectedEntryFee / 20));
+  const entrySafe = Math.max(1, selectedEntryFee || 100);
+  const targetRadius = 7 + Math.min(12, Math.sqrt(Math.max(0, player.ves)) * 0.16);
+  player.radius += (targetRadius - player.radius) * Math.min(1, 0.16 * dtFactor);
+
+  const targetLength = Math.max(10, Math.floor(10 + player.ves / (entrySafe / 14)));
+  player.visualLength += (targetLength - player.visualLength) * Math.min(1, 0.14 * dtFactor);
+  player.length = Math.round(player.visualLength);
 
   let currentSpeed = player.speed;
 
-  if (isBoosting && player.ves > (selectedEntryFee * 0.1)) {
-    currentSpeed = 4.6;
-    player.ves = Math.max(0, player.ves - (selectedEntryFee * 0.0005) * dtFactor);
+  if (isBoosting && player.ves > (entrySafe * 0.1)) {
+    currentSpeed = 3.1;
+    player.ves = Math.max(0, player.ves - (entrySafe * 0.0005) * dtFactor);
   }
 
   let targetAngle = player.angle;
@@ -489,7 +497,7 @@ function updateLocalPlayer(dtFactor = 1) {
   let diff = targetAngle - player.angle;
   while (diff < -Math.PI) diff += Math.PI * 2;
   while (diff > Math.PI) diff -= Math.PI * 2;
-  const turnSmooth = Math.min(1, 0.18 * dtFactor);
+  const turnSmooth = Math.min(1, 0.16 * dtFactor);
   player.angle += diff * turnSmooth;
 
   player.x += Math.cos(player.angle) * currentSpeed * dtFactor;
@@ -586,38 +594,45 @@ function drawPlayer(p, camera, isLocal, dtFactor = 1) {
         p.x = p.targetX;
         p.y = p.targetY;
       } else {
-        const dist = Math.hypot(p.targetX - p.x, p.targetY - p.y);
-        if (dist > 250) {
+        const dx = p.targetX - p.x;
+        const dy = p.targetY - p.y;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > 300) {
           p.x = p.targetX;
           p.y = p.targetY;
-        } else {
-          const spd = p.currentSpeed || 2.6;
-          if (p.targetAngle !== undefined) {
-            p.x += Math.cos(p.targetAngle) * spd * dtFactor;
-            p.y += Math.sin(p.targetAngle) * spd * dtFactor;
-            p.targetX += Math.cos(p.targetAngle) * spd * dtFactor;
-            p.targetY += Math.sin(p.targetAngle) * spd * dtFactor;
+          if (Array.isArray(p.targetBody) && p.targetBody.length > 0) {
+            p.body = p.targetBody.map(seg => ({ x: seg.x, y: seg.y }));
           }
-          const lerpFactor = Math.min(1, 0.24 * dtFactor);
-          p.x += (p.targetX - p.x) * lerpFactor;
-          p.y += (p.targetY - p.y) * lerpFactor;
+        } else if (dist > 0.1) {
+          const lerpFactor = Math.min(0.45, 0.24 * dtFactor);
+          p.x += dx * lerpFactor;
+          p.y += dy * lerpFactor;
         }
       }
     }
 
     if (p.targetBody && Array.isArray(p.targetBody) && p.targetBody.length > 0) {
-      if (!p.body || p.body.length !== p.targetBody.length) {
+      if (!p.body || p.body.length === 0) {
         p.body = p.targetBody.map(seg => ({ x: seg.x, y: seg.y }));
       } else {
+        while (p.body.length < p.targetBody.length) {
+          const tail = p.body[p.body.length - 1] || { x: p.x, y: p.y };
+          p.body.push({ x: tail.x, y: tail.y });
+        }
+        while (p.body.length > p.targetBody.length && p.body.length > 2) {
+          p.body.pop();
+        }
+
         p.body[0].x = p.x;
         p.body[0].y = p.y;
-        const bodyLerp = Math.min(1, 0.45 * dtFactor);
+
+        const bodyLerp = Math.min(0.55, 0.35 * dtFactor);
         for (let i = 1; i < p.body.length; i++) {
-          const prev = p.body[i - 1];
           const curr = p.body[i];
-          const targetSeg = p.targetBody[i];
-          curr.x += ((prev.x + targetSeg.x) * 0.5 - curr.x) * bodyLerp;
-          curr.y += ((prev.y + targetSeg.y) * 0.5 - curr.y) * bodyLerp;
+          const targetSeg = p.targetBody[i] || p.body[i - 1];
+          curr.x += (targetSeg.x - curr.x) * bodyLerp;
+          curr.y += (targetSeg.y - curr.y) * bodyLerp;
         }
       }
     }
@@ -628,7 +643,7 @@ function drawPlayer(p, camera, isLocal, dtFactor = 1) {
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  const wormRadius = Math.max(5.5, 9 * Math.min(1.35, 1 + Math.sqrt(p.ves || 0) * 0.04));
+  const wormRadius = Math.max(4, 6.5 * Math.min(1.25, 1 + Math.sqrt(p.ves || 0) * 0.025));
   ctx.lineWidth = wormRadius * 2;
 
   if (p.skinId === 've') {
@@ -728,7 +743,7 @@ function drawLeaderboard() {
 function cleanupInactiveRemotePlayers() {
   const now = Date.now();
   Object.keys(remotePlayers).forEach(id => {
-    if (now - remotePlayers[id].lastUpdate > 3500) {
+    if (now - remotePlayers[id].lastUpdate > 8500) {
       delete remotePlayers[id];
     }
   });
@@ -949,7 +964,7 @@ function gameLoop(timestamp) {
   const rawElapsed = timestamp - lastTime;
   lastTime = timestamp;
 
-  const dtFactor = Math.min(2.5, Math.max(0.2, rawElapsed / (1000 / 60)));
+  const dtFactor = Math.min(1.8, Math.max(0.3, rawElapsed / (1000 / 60)));
 
   if (gameActive) {
     renderArenaFrame(dtFactor);
