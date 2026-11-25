@@ -562,7 +562,7 @@ function updateLocalPlayer(dtFactor = 1) {
 
   if (gameRoom && gameActive) {
     const now = Date.now();
-    if (now - lastSendTime > 80) {
+    if (now - lastSendTime > 65) {
       lastSendTime = now;
       gameRoom.send({
         type: 'broadcast',
@@ -605,7 +605,7 @@ function drawPlayer(p, camera, isLocal, dtFactor = 1) {
             p.body = p.targetBody.map(seg => ({ x: seg.x, y: seg.y }));
           }
         } else if (dist > 0.1) {
-          const lerpFactor = Math.min(0.45, 0.24 * dtFactor);
+          const lerpFactor = Math.min(0.35, 0.18 * dtFactor);
           p.x += dx * lerpFactor;
           p.y += dy * lerpFactor;
         }
@@ -627,7 +627,7 @@ function drawPlayer(p, camera, isLocal, dtFactor = 1) {
         p.body[0].x = p.x;
         p.body[0].y = p.y;
 
-        const bodyLerp = Math.min(0.55, 0.35 * dtFactor);
+        const bodyLerp = Math.min(0.42, 0.26 * dtFactor);
         for (let i = 1; i < p.body.length; i++) {
           const curr = p.body[i];
           const targetSeg = p.targetBody[i] || p.body[i - 1];
