@@ -77,6 +77,7 @@
       display: flex;
       gap: 20px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .nav-link {
@@ -99,7 +100,8 @@
     .nav-user {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .balance-pill {
@@ -135,6 +137,75 @@
       justify-content: center;
       font-weight: bold;
       font-size: 0.9rem;
+    }
+
+    /* ETIQUETAS DE ESTADO KYC (ROJO / AMARILLO / VERDE) */
+    .kyc-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .kyc-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .kyc-unverified, .kyc-rejected {
+      background: rgba(239, 68, 68, 0.14);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.45);
+    }
+    .kyc-unverified .kyc-dot, .kyc-rejected .kyc-dot { background: #ef4444; }
+
+    .kyc-pending {
+      background: rgba(245, 158, 11, 0.14);
+      color: #fbbf24;
+      border-color: rgba(245, 158, 11, 0.45);
+    }
+    .kyc-pending .kyc-dot { background: #f59e0b; }
+
+    .kyc-verified {
+      background: rgba(34, 197, 94, 0.14);
+      color: #4ade80;
+      border-color: rgba(34, 197, 94, 0.45);
+    }
+    .kyc-verified .kyc-dot { background: #22c55e; }
+
+    .profile-kyc-banner {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .btn-verify-trigger {
+      background: #0ea5e9;
+      color: #ffffff;
+      border: none;
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .btn-verify-trigger:hover {
+      background: #0284c7;
     }
 
     /* CONTENEDOR PRINCIPAL */
@@ -202,6 +273,9 @@
     @media (max-width: 768px) {
       .dashboard-top-grid {
         grid-template-columns: 1fr;
+      }
+      .methods-grid {
+        grid-template-columns: 1fr !important;
       }
     }
 
@@ -522,6 +596,99 @@
       background: #16a34a;
       color: #ffffff;
     }
+
+    /* MODALES KYC (BLOQUEO Y FORMULARIO) */
+    .kyc-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.84);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 9999;
+    }
+
+    .kyc-modal-backdrop.active {
+      display: flex;
+    }
+
+    .kyc-modal-card {
+      background: #0b0f19;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 450px;
+      padding: 24px;
+      max-height: 92vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
+    }
+
+    .kyc-modal-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+
+    .kyc-modal-desc {
+      font-size: 0.88rem;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .kyc-rejection-alert {
+      background: rgba(239, 68, 68, 0.14);
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      color: #fca5a5;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      margin-bottom: 14px;
+      display: none;
+    }
+
+    .kyc-actions-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .kyc-btn-cancel {
+      flex: 1;
+      padding: 11px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: #1e293b;
+      color: #f8fafc;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .kyc-btn-submit {
+      flex: 1;
+      padding: 11px;
+      border-radius: 8px;
+      border: none;
+      background: #0ea5e9;
+      color: #ffffff;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .kyc-btn-submit:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .kyc-feedback {
+      margin-top: 12px;
+      font-size: 0.83rem;
+      text-align: center;
+      min-height: 18px;
+    }
   </style>
 </head>
 <body>
@@ -545,6 +712,10 @@
     </nav>
 
     <div class="nav-user">
+      <div id="nav-kyc-badge" class="kyc-pill kyc-unverified" onclick="manejarClickEtiquetaKyc()" title="Estado de verificación de cuenta">
+        <span class="kyc-dot"></span>
+        <span id="nav-kyc-text">No verificado</span>
+      </div>
       <div class="balance-pill">
         <span class="balance-pill-label">Saldo Disponible</span>
         <span class="balance-pill-value" id="nav-balance">100,00 VES</span>
@@ -563,9 +734,9 @@
         <span class="hero-badge">⚡ Sistema de Lobby en Tiempo Real</span>
         <h1 class="hero-title">APUESTA, SOBREVIVE Y GANA BOLÍVARES</h1>
         <p class="hero-desc">Ingresa en salas multijugador. Tienes 10 segundos de preparación sin comida ni muertes para posicionarte, seguidos de 60 segundos de combate letal.</p>
-        <div style="display: flex; gap: 12px;">
-          <button onclick="switchTab('deposit', event)" style="background: #0ea5e9; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer;">+ RECARGAR SALDO</button>
-          <button onclick="switchTab('withdraw', event)" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); color: white; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer;">SOLICITAR RETIRO</button>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <button onclick="intentarAbrirPestanaProtegida('deposit', event)" style="background: #0ea5e9; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer;">+ RECARGAR SALDO</button>
+          <button onclick="intentarAbrirPestanaProtegida('withdraw', event)" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); color: white; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer;">SOLICITAR RETIRO</button>
         </div>
       </div>
 
@@ -577,7 +748,7 @@
         </div>
       </div>
 
-      <!-- TARJETA REDISEÑADA: SALA DE PRÁCTICA -->
+      <!-- TARJETA REDISEÑADA: SALA DE PRÁCTICA (SIEMPRE DISPONIBLE) -->
       <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 20px; margin-bottom: 25px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 15px; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);">
         <div>
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
@@ -720,7 +891,24 @@
     <section id="view-profile" class="view-section">
       <div class="deposit-card">
         <h2 class="deposit-title">👤 Perfil y Datos Bancarios</h2>
-        <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px;" id="profile-email">Cargando datos de perfil...</p>
+        <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 16px;" id="profile-email">Cargando datos de perfil...</p>
+
+        <!-- ESTADO DE VERIFICACIÓN EN PERFIL -->
+        <div class="profile-kyc-banner">
+          <div>
+            <span style="font-size: 0.72rem; color: #94a3b8; display: block; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">Estado de verificación de identidad</span>
+            <div id="profile-kyc-badge" class="kyc-pill kyc-unverified">
+              <span class="kyc-dot"></span>
+              <span id="profile-kyc-text">No verificado</span>
+            </div>
+            <p id="profile-kyc-subtext" style="font-size: 0.8rem; color: #94a3b8; margin-top: 8px;">
+              Necesitas verificar tu cuenta para depositar, retirar y entrar a salas reales.
+            </p>
+          </div>
+          <button type="button" id="btn-perfil-verificar" class="btn-verify-trigger" onclick="abrirFormularioKyc()">
+            🪪 Verificar cuenta
+          </button>
+        </div>
 
         <!-- SECCIÓN DE REFERIDOS, TOKENS Y CONVERSIÓN A BOLÍVARES -->
         <div class="referral-box">
@@ -793,6 +981,70 @@
 
   </main>
 
+  <!-- MODAL 1: AVISO DE BLOQUEO KYC -->
+  <div id="kyc-lock-modal" class="kyc-modal-backdrop">
+    <div class="kyc-modal-card">
+      <h3 id="kyc-lock-title" class="kyc-modal-title">🔒 Debes verificar tu cuenta</h3>
+      <p id="kyc-lock-desc" class="kyc-modal-desc">
+        Para evitar multicuentas y proteger a la comunidad, debes verificar tu identidad antes de depositar, retirar o jugar en salas reales. Puedes seguir jugando gratis en la Sala de Práctica con bots.
+      </p>
+      <div id="kyc-lock-rejection" class="kyc-rejection-alert"></div>
+      <div class="kyc-actions-row">
+        <button type="button" class="kyc-btn-cancel" onclick="cerrarModalKyc('kyc-lock-modal')">Cerrar</button>
+        <button type="button" id="kyc-lock-verify-btn" class="kyc-btn-submit" onclick="abrirFormularioKyc()">Verificar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: FORMULARIO DE VERIFICACIÓN KYC -->
+  <div id="kyc-form-modal" class="kyc-modal-backdrop">
+    <div class="kyc-modal-card">
+      <h3 class="kyc-modal-title">🪪 Verificación de Identidad</h3>
+      <p class="kyc-modal-desc">
+        Ingresa tus datos reales tal como aparecen en tu documento y en tu registro.
+      </p>
+
+      <form id="kyc-submit-form">
+        <div class="input-group">
+          <label for="kyc-input-cedula">Número de Cédula</label>
+          <input type="text" id="kyc-input-cedula" placeholder="Ej. V12345678" required>
+        </div>
+
+        <div class="input-group">
+          <label for="kyc-input-nacimiento">Fecha de Nacimiento</label>
+          <input type="date" id="kyc-input-nacimiento" required>
+        </div>
+
+        <div class="input-group">
+          <label for="kyc-input-genero">Género</label>
+          <select id="kyc-input-genero" required>
+            <option value="">Selecciona género...</option>
+            <option value="Masculino">Masculino</option>
+            <option value="Femenino">Femenino</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="kyc-input-foto-cedula">Foto de Cédula</label>
+          <input type="file" id="kyc-input-foto-cedula" accept="image/*" required>
+        </div>
+
+        <div class="input-group">
+          <label for="kyc-input-selfie">Selfie</label>
+          <input type="file" id="kyc-input-selfie" accept="image/*" capture="user" required>
+        </div>
+
+        <div id="kyc-form-feedback" class="kyc-feedback"></div>
+
+        <div class="kyc-actions-row">
+          <button type="button" class="kyc-btn-cancel" onclick="cerrarModalKyc('kyc-form-modal')">Cancelar</button>
+          <button type="submit" id="kyc-btn-enviar" class="kyc-btn-submit">Enviar verificación</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     // --- BLOQUEO DE TECLAS DE CONSOLA / INSPECTOR Y CLIC DERECHO ---
     document.addEventListener('keydown', function(e) {
@@ -828,6 +1080,10 @@
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let selectedPaymentMethod = 'pago_movil';
 
+    // --- ESTADO KYC DEL USUARIO ---
+    let estadoKycActual = 'unverified';
+    let motivoRechazoKyc = '';
+
     // --- REGLAS DE RETIRO (VES) ---
     const MIN_RETIRO_VES = 1000;
     const MAX_RETIRO_VES = 10000;
@@ -836,6 +1092,249 @@
     // --- CONFIGURACIÓN DE TOKENS A BOLÍVARES (1.000 TOKENS = 1.000 VES) ---
     const TASA_TOKEN_A_VES = 1;
     const MINIMO_TOKENS_CANJE = 1000;
+
+    function obtenerIdentificadorUsuario() {
+      const userId = sessionStorage.getItem('user_id') || localStorage.getItem('user_id');
+      const userEmail = sessionStorage.getItem('user_email') || localStorage.getItem('user_email');
+      return { userId, userEmail };
+    }
+
+    function renderizarEstadoKyc(status, motivo = '') {
+      estadoKycActual = (status || 'unverified').toLowerCase().trim();
+      motivoRechazoKyc = motivo || '';
+
+      const navBadge = document.getElementById('nav-kyc-badge');
+      const navText = document.getElementById('nav-kyc-text');
+      const profBadge = document.getElementById('profile-kyc-badge');
+      const profText = document.getElementById('profile-kyc-text');
+      const profSub = document.getElementById('profile-kyc-subtext');
+      const btnPerfilVerificar = document.getElementById('btn-perfil-verificar');
+
+      const clases = ['kyc-unverified', 'kyc-pending', 'kyc-verified', 'kyc-rejected'];
+      [navBadge, profBadge].forEach(el => {
+        if (!el) return;
+        el.classList.remove(...clases);
+      });
+
+      if (estadoKycActual === 'verified') {
+        if (navBadge) navBadge.classList.add('kyc-verified');
+        if (navText) navText.textContent = 'Verificado';
+        if (profBadge) profBadge.classList.add('kyc-verified');
+        if (profText) profText.textContent = 'Verificado';
+        if (profSub) profSub.textContent = 'Tu identidad está verificada. Tienes acceso a depósitos, retiros y salas reales.';
+        if (btnPerfilVerificar) btnPerfilVerificar.style.display = 'none';
+      } else if (estadoKycActual === 'pending') {
+        if (navBadge) navBadge.classList.add('kyc-pending');
+        if (navText) navText.textContent = 'En revisión';
+        if (profBadge) profBadge.classList.add('kyc-pending');
+        if (profText) profText.textContent = 'En revisión';
+        if (profSub) profSub.textContent = 'Tu solicitud fue enviada y está en revisión en el panel de administración.';
+        if (btnPerfilVerificar) btnPerfilVerificar.style.display = 'none';
+      } else if (estadoKycActual === 'rejected') {
+        if (navBadge) navBadge.classList.add('kyc-rejected');
+        if (navText) navText.textContent = 'No verificado';
+        if (profBadge) profBadge.classList.add('kyc-rejected');
+        if (profText) profText.textContent = 'No verificado';
+        if (profSub) profSub.textContent = motivoRechazoKyc ? `Rechazado: ${motivoRechazoKyc}. Envía tus datos nuevamente.` : 'Tu verificación fue rechazada. Revisa tus datos y vuelve a enviarla.';
+        if (btnPerfilVerificar) {
+          btnPerfilVerificar.style.display = 'inline-block';
+          btnPerfilVerificar.textContent = '🔄 Reenviar verificación';
+        }
+      } else {
+        if (navBadge) navBadge.classList.add('kyc-unverified');
+        if (navText) navText.textContent = 'No verificado';
+        if (profBadge) profBadge.classList.add('kyc-unverified');
+        if (profText) profText.textContent = 'No verificado';
+        if (profSub) profSub.textContent = 'Debes verificar tu cuenta para depositar, retirar y jugar en salas reales.';
+        if (btnPerfilVerificar) {
+          btnPerfilVerificar.style.display = 'inline-block';
+          btnPerfilVerificar.textContent = '🪪 Verificar cuenta';
+        }
+      }
+    }
+
+    async function consultarEstadoKycFresca() {
+      const { userId, userEmail } = obtenerIdentificadorUsuario();
+      if (!userId && !userEmail) return estadoKycActual;
+
+      let query = supabaseClient
+        .from('profiles')
+        .select('kyc_status, kyc_motivo_rechazo');
+
+      query = userId ? query.eq('id', userId) : query.eq('email', userEmail);
+      const { data, error } = await query.maybeSingle();
+
+      if (!error && data) {
+        renderizarEstadoKyc(data.kyc_status || 'unverified', data.kyc_motivo_rechazo || '');
+      }
+      return estadoKycActual;
+    }
+
+    function mostrarAvisoBloqueoKyc(contextoAccion = 'realizar esta acción') {
+      const titleEl = document.getElementById('kyc-lock-title');
+      const descEl = document.getElementById('kyc-lock-desc');
+      const rejEl = document.getElementById('kyc-lock-rejection');
+      const btnVerify = document.getElementById('kyc-lock-verify-btn');
+
+      rejEl.style.display = 'none';
+      rejEl.textContent = '';
+
+      if (estadoKycActual === 'pending') {
+        titleEl.textContent = '⏳ Verificación en revisión';
+        descEl.textContent = `Tu solicitud de verificación está en revisión. Una vez aprobada, podrás ${contextoAccion}. Mientras tanto, puedes usar la Sala de Práctica gratis con bots.`;
+        btnVerify.style.display = 'none';
+      } else {
+        titleEl.textContent = '🔒 Debes verificar tu cuenta';
+        descEl.textContent = `Debes verificar tu cuenta para ${contextoAccion}. Esto evita multicuentas y protege la plataforma. Puedes jugar en la Sala de Práctica gratis con bots.`;
+        btnVerify.style.display = 'block';
+        btnVerify.textContent = 'Verificar';
+
+        if (estadoKycActual === 'rejected' && motivoRechazoKyc) {
+          rejEl.style.display = 'block';
+          rejEl.textContent = `Motivo de rechazo: ${motivoRechazoKyc}`;
+        }
+      }
+
+      document.getElementById('kyc-lock-modal').classList.add('active');
+    }
+
+    function manejarClickEtiquetaKyc() {
+      if (estadoKycActual === 'verified') {
+        alert('✅ Tu cuenta ya está verificada.');
+        return;
+      }
+      mostrarAvisoBloqueoKyc('depositar, retirar o entrar a salas reales');
+    }
+
+    function abrirFormularioKyc() {
+      if (estadoKycActual === 'pending') {
+        mostrarAvisoBloqueoKyc('depositar, retirar o entrar a salas reales');
+        return;
+      }
+      cerrarModalKyc('kyc-lock-modal');
+      document.getElementById('kyc-form-feedback').textContent = '';
+      document.getElementById('kyc-form-modal').classList.add('active');
+    }
+
+    function cerrarModalKyc(modalId) {
+      const el = document.getElementById(modalId);
+      if (el) el.classList.remove('active');
+    }
+
+    async function intentarAbrirPestanaProtegida(tabId, event) {
+      await consultarEstadoKycFresca();
+      if (estadoKycActual !== 'verified') {
+        const textoAccion = tabId === 'deposit' ? 'depositar saldo' : 'solicitar retiros';
+        mostrarAvisoBloqueoKyc(textoAccion);
+        return;
+      }
+      switchTab(tabId, event);
+    }
+
+    document.getElementById('kyc-submit-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const { userId, userEmail } = obtenerIdentificadorUsuario();
+      if (!userId && !userEmail) {
+        alert('⚠️ Debes iniciar sesión para verificar tu cuenta.');
+        return;
+      }
+
+      const cedula = document.getElementById('kyc-input-cedula').value.trim().toUpperCase();
+      const fechaNacimiento = document.getElementById('kyc-input-nacimiento').value;
+      const genero = document.getElementById('kyc-input-genero').value;
+      const archivoCedula = document.getElementById('kyc-input-foto-cedula').files[0];
+      const archivoSelfie = document.getElementById('kyc-input-selfie').files[0];
+      const feedbackEl = document.getElementById('kyc-form-feedback');
+      const btnEnviar = document.getElementById('kyc-btn-enviar');
+
+      if (!cedula || !fechaNacimiento || !genero || !archivoCedula || !archivoSelfie) {
+        feedbackEl.style.color = '#f87171';
+        feedbackEl.textContent = 'Completa todos los campos y adjunta ambas fotos.';
+        return;
+      }
+
+      const hoy = new Date();
+      const nac = new Date(fechaNacimiento + 'T00:00:00');
+      let edad = hoy.getFullYear() - nac.getFullYear();
+      const mesDiff = hoy.getMonth() - nac.getMonth();
+      if (mesDiff < 0 || (mesDiff === 0 && hoy.getDate() < nac.getDate())) {
+        edad--;
+      }
+
+      if (Number.isNaN(edad) || edad < 18) {
+        feedbackEl.style.color = '#f87171';
+        feedbackEl.textContent = 'Debes ser mayor de 18 años para verificar tu cuenta.';
+        return;
+      }
+
+      btnEnviar.disabled = true;
+      feedbackEl.style.color = '#fbbf24';
+      feedbackEl.textContent = 'Subiendo documentos...';
+
+      try {
+        let perfilId = userId;
+        if (!perfilId && userEmail) {
+          const { data: prof } = await supabaseClient
+            .from('profiles')
+            .select('id')
+            .eq('email', userEmail)
+            .maybeSingle();
+          perfilId = prof?.id;
+        }
+
+        if (!perfilId) {
+          throw new Error('No se encontró tu perfil de usuario.');
+        }
+
+        const extCedula = (archivoCedula.name.split('.').pop() || 'jpg').toLowerCase();
+        const extSelfie = (archivoSelfie.name.split('.').pop() || 'jpg').toLowerCase();
+
+        const pathCedula = `${perfilId}/cedula.${extCedula}`;
+        const pathSelfie = `${perfilId}/selfie.${extSelfie}`;
+
+        const { error: errCed } = await supabaseClient.storage
+          .from('kyc-documents')
+          .upload(pathCedula, archivoCedula, { upsert: true });
+        if (errCed) throw errCed;
+
+        const { error: errSelf } = await supabaseClient.storage
+          .from('kyc-documents')
+          .upload(pathSelfie, archivoSelfie, { upsert: true });
+        if (errSelf) throw errSelf;
+
+        const { error: rpcError } = await supabaseClient.rpc('enviar_solicitud_kyc', {
+         p_cedula: cedula,
+         p_fecha_nacimiento: fechaNacimiento,
+         p_genero: genero,
+         p_cedula_foto_url: pathCedula,
+         p_selfie_foto_url: pathSelfie,
+         p_user_id: perfilId
+      });
+      
+        if (rpcError) {
+          if (String(rpcError.message || '').includes('profiles_cedula_unique_idx')) {
+            throw new Error('Esta cédula ya está registrada en otra cuenta.');
+          }
+          throw rpcError;
+        }
+
+        renderizarEstadoKyc('pending', '');
+        feedbackEl.style.color = '#4ade80';
+        feedbackEl.textContent = '✅ Solicitud enviada. Estado actual: En revisión.';
+
+        setTimeout(() => {
+          cerrarModalKyc('kyc-form-modal');
+          btnEnviar.disabled = false;
+          document.getElementById('kyc-submit-form').reset();
+        }, 1200);
+
+      } catch (err) {
+        feedbackEl.style.color = '#f87171';
+        feedbackEl.textContent = err.message || 'Error al enviar la verificación.';
+        btnEnviar.disabled = false;
+      }
+    });
 
     function generarCodigoReferidoDashboard() {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -862,8 +1361,7 @@
     }
 
     async function cargarDatosReferidosPerfil() {
-      const userId = localStorage.getItem('user_id');
-      const userEmail = localStorage.getItem('user_email');
+      const { userId, userEmail } = obtenerIdentificadorUsuario();
       if (!userId && !userEmail) return;
 
       let query = supabaseClient
@@ -929,8 +1427,7 @@
         return;
       }
 
-      const userId = localStorage.getItem('user_id');
-      const userEmail = localStorage.getItem('user_email');
+      const { userId, userEmail } = obtenerIdentificadorUsuario();
       if (!userId && !userEmail) {
         msgEl.style.color = '#f87171';
         msgEl.innerText = '❌ Sesión no válida.';
@@ -1029,10 +1526,9 @@
       canalesSalas[salaId] = canal;
     });
 
-    // --- FUNCIÓN UNIRSE A SALA ---
+    // --- FUNCIÓN UNIRSE A SALA (BLOQUEA SI NO ESTÁ VERIFICADO) ---
     async function unirseASala(salaId, costoEntrada) {
-      const userId = localStorage.getItem('user_id');
-      const userEmail = localStorage.getItem('user_email');
+      const { userId, userEmail } = obtenerIdentificadorUsuario();
 
       if (!userId && !userEmail) {
         alert("⚠️ Debes iniciar sesión para entrar a una sala de apuestas.");
@@ -1040,7 +1536,7 @@
         return;
       }
 
-      let query = supabaseClient.from('profiles').select('id, balance');
+      let query = supabaseClient.from('profiles').select('id, balance, kyc_status, kyc_motivo_rechazo');
       if (userId) {
         query = query.eq('id', userId);
       } else {
@@ -1050,7 +1546,14 @@
       const { data: profile, error } = await query.maybeSingle();
 
       if (error || !profile) {
-        alert("Error al verificar tu saldo en el servidor.");
+        alert("Error al verificar tu cuenta en el servidor.");
+        return;
+      }
+
+      renderizarEstadoKyc(profile.kyc_status || 'unverified', profile.kyc_motivo_rechazo || '');
+
+      if (estadoKycActual !== 'verified') {
+        mostrarAvisoBloqueoKyc('entrar a salas reales');
         return;
       }
 
@@ -1067,15 +1570,29 @@
       window.location.href = 'game.html';
     }
 
-    function switchTab(tabId, event) {
+    async function switchTab(tabId, event) {
+      if (tabId === 'deposit' || tabId === 'withdraw') {
+        await consultarEstadoKycFresca();
+        if (estadoKycActual !== 'verified') {
+          mostrarAvisoBloqueoKyc(tabId === 'deposit' ? 'depositar saldo' : 'solicitar retiros');
+          return;
+        }
+      }
+
       document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
 
       const target = document.getElementById(`view-${tabId}`);
       if (target) target.classList.add('active');
 
-      if (event && event.currentTarget) {
+      if (event && event.currentTarget && event.currentTarget.classList.contains('nav-link')) {
         event.currentTarget.classList.add('active');
+      } else {
+        const navBtn = Array.from(document.querySelectorAll('.nav-link')).find(btn => {
+          const fnText = btn.getAttribute('onclick') || '';
+          return fnText.includes(`'${tabId}'`);
+        });
+        if (navBtn) navBtn.classList.add('active');
       }
 
       if (tabId === 'withdraw') {
@@ -1085,6 +1602,7 @@
         selectPaymentMethod(selectedPaymentMethod);
       }
       if (tabId === 'profile') {
+        consultarEstadoKycFresca();
         cargarDatosReferidosPerfil();
       }
     }
@@ -1164,8 +1682,7 @@
     }
 
     async function loadUserData() {
-      const userId = localStorage.getItem('user_id');
-      const userEmail = localStorage.getItem('user_email');
+      const { userId, userEmail } = obtenerIdentificadorUsuario();
 
       if (!userId && !userEmail) return;
 
@@ -1190,10 +1707,18 @@
         if (avatarEl && profile.email) {
           avatarEl.innerText = profile.email.substring(0, 2).toUpperCase();
         }
+
+        renderizarEstadoKyc(profile.kyc_status || 'unverified', profile.kyc_motivo_rechazo || '');
       }
     }
 
     async function submitDeposit() {
+      await consultarEstadoKycFresca();
+      if (estadoKycActual !== 'verified') {
+        mostrarAvisoBloqueoKyc('registrar depósitos');
+        return;
+      }
+
       const amountInput = document.getElementById('deposit-amount').value;
       const reference = document.getElementById('deposit-reference').value.trim();
       const amount = parseFloat(amountInput);
@@ -1207,7 +1732,7 @@
         return;
       }
 
-      const userId = localStorage.getItem('user_id');
+      const { userId } = obtenerIdentificadorUsuario();
       if (!userId) {
         alert("Sesión no válida. Inicia sesión nuevamente.");
         return;
@@ -1234,7 +1759,7 @@
     }
 
     async function loadUserBankAccount() {
-      const userId = localStorage.getItem('user_id');
+      const { userId } = obtenerIdentificadorUsuario();
       const selectEl = document.getElementById('saved-accounts-select');
       if (!selectEl) return;
 
@@ -1270,7 +1795,7 @@
         return;
       }
 
-      const userId = sessionStorage.getItem('user_id') || localStorage.getItem('user_id');
+      const { userId } = obtenerIdentificadorUsuario();
       
       if (!userId) {
         alert("Error: No se encontró la sesión del usuario. Por favor vuelve a iniciar sesión.");
@@ -1343,6 +1868,12 @@
     }
 
     async function submitWithdrawal() {
+      await consultarEstadoKycFresca();
+      if (estadoKycActual !== 'verified') {
+        mostrarAvisoBloqueoKyc('solicitar retiros');
+        return;
+      }
+
       const amountInput = document.getElementById('withdraw-amount').value;
       const selectElement = document.getElementById('saved-accounts-select').value;
       const amount = parseFloat(amountInput);
@@ -1364,15 +1895,14 @@
         return;
       }
 
-      const userId = localStorage.getItem('user_id');
-      const userEmail = localStorage.getItem('user_email');
+      const { userId, userEmail } = obtenerIdentificadorUsuario();
 
       if (!userId && !userEmail) {
         alert("No se encontró la sesión del usuario.");
         return;
       }
 
-      let query = supabaseClient.from('profiles').select('id, balance');
+      let query = supabaseClient.from('profiles').select('id, balance, kyc_status');
       if (userId) query = query.eq('id', userId);
       else query = query.eq('email', userEmail);
 
@@ -1380,6 +1910,12 @@
 
       if (errFetch || !profile) {
         alert("No se pudo verificar tu saldo en el servidor.");
+        return;
+      }
+
+      if ((profile.kyc_status || 'unverified') !== 'verified') {
+        renderizarEstadoKyc(profile.kyc_status || 'unverified');
+        mostrarAvisoBloqueoKyc('solicitar retiros');
         return;
       }
 
@@ -1436,6 +1972,7 @@
 
     function logout() {
       localStorage.clear();
+      sessionStorage.clear();
       window.location.href = 'index.html';
     }
 

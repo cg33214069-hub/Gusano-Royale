@@ -202,6 +202,50 @@
     .btn-approve:hover { background: #16a34a; }
     .btn-reject:hover { background: #dc2626; }
 
+    /* TARJETAS DE VERIFICACIÓN KYC */
+    .kyc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 16px;
+    }
+    .kyc-card {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .kyc-data-box {
+      background: #030712;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      line-height: 1.65;
+      color: #cbd5e1;
+    }
+    .kyc-photos-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .kyc-photo-box {
+      background: #030712;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 8px;
+      text-align: center;
+    }
+    .kyc-photo-box img {
+      width: 100%;
+      height: 135px;
+      object-fit: cover;
+      border-radius: 6px;
+      margin-top: 6px;
+    }
+
     /* ESTILOS DE LOS MODALES */
     .modal-overlay {
       position: fixed;
@@ -303,7 +347,7 @@
   <div class="admin-container">
     <header>
       <h1>🛡️ Panel de Administración - Gusanos Royale</h1>
-      <button onclick="loadData(); loadPromotoresData(); chequearEstadoComida();" style="background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">🔄 Actualizar Datos</button>
+      <button onclick="loadData(); loadPromotoresData(); chequearEstadoComida(); cargarSolicitudesKycAdmin();" style="background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">🔄 Actualizar Datos</button>
     </header>
 
     <!-- CONTROL DE COMIDA EN EL MAPA -->
@@ -416,6 +460,7 @@
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('deposits', this)">💳 Solicitudes de Depósito</button>
       <button class="tab-btn" onclick="switchTab('withdrawals', this)">💸 Solicitudes de Retiro</button>
+      <button class="tab-btn" onclick="switchTab('kyc', this)">🪪 Verificación de Cuentas (<span id="kyc-pending-count">0</span>)</button>
       <button class="tab-btn" onclick="switchTab('promoters', this)">💼 Gestión de Promotores</button>
     </div>
 
@@ -446,6 +491,23 @@
           <tr><td colspan="7" style="text-align: center; color: #64748b;">No hay solicitudes de retiro.</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- SECCIÓN DE VERIFICACIÓN DE CUENTAS (KYC) -->
+    <div id="section-kyc" class="card" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
+        <div>
+          <h2 style="font-size: 1.15rem; color: #38bdf8;">🪪 Solicitudes de Verificación de Cuentas</h2>
+          <p style="font-size: 0.82rem; color: #94a3b8;">Verifica que la cédula, fecha de nacimiento, género y fotos coincidan con la cuenta del usuario.</p>
+        </div>
+        <button type="button" onclick="cargarSolicitudesKycAdmin()" style="background: #0284c7; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">
+          🔄 Refrescar KYC
+        </button>
+      </div>
+
+      <div id="admin-kyc-container" class="kyc-grid">
+        <p style="color: #64748b;">Cargando solicitudes de verificación...</p>
+      </div>
     </div>
 
     <!-- SECCIÓN DE GESTIÓN DE PROMOTORES -->
@@ -558,6 +620,9 @@
     let globalUserMap = {}; 
     let activeWithdrawal = null; 
 
+    // Si tienes un backend en Render/Node con /api/admin/kyc/pending y /api/admin/kyc/resolve, pon aquí la URL base.
+    const ADMIN_BACKEND_URL = '';
+
     // ==========================================
     // CONTROL DE COMIDA Y VES EN EL MAPA
     // ==========================================
@@ -633,19 +698,204 @@
 
     function switchTab(type, btnElement) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      btnElement.classList.add('active');
+      if (btnElement) btnElement.classList.add('active');
 
       document.getElementById('section-deposits').style.display = 'none';
       document.getElementById('section-withdrawals').style.display = 'none';
+      document.getElementById('section-kyc').style.display = 'none';
       document.getElementById('section-promoters').style.display = 'none';
 
       if (type === 'deposits') {
         document.getElementById('section-deposits').style.display = 'block';
       } else if (type === 'withdrawals') {
         document.getElementById('section-withdrawals').style.display = 'block';
+      } else if (type === 'kyc') {
+        document.getElementById('section-kyc').style.display = 'block';
+        cargarSolicitudesKycAdmin();
       } else if (type === 'promoters') {
         document.getElementById('section-promoters').style.display = 'block';
         loadPromotoresData();
+      }
+    }
+
+    // ==========================================
+    // VERIFICACIÓN DE CUENTAS (KYC ADMIN)
+    // ==========================================
+    async function cargarSolicitudesKycAdmin() {
+  const contenedor = document.getElementById('admin-kyc-container');
+  const contadorEl = document.getElementById('kyc-pending-count');
+  if (!contenedor) return;
+
+  contenedor.innerHTML = "<p style='color: #64748b;'>Cargando solicitudes de verificación...</p>";
+
+  try {
+    const { data: usuarios, error } = await supabaseClient
+      .from('profiles')
+      .select('*')
+      .eq('kyc_status', 'pending')
+      .order('kyc_enviado_en', { ascending: true });
+
+    if (error) {
+      contenedor.innerHTML = `<p style="color: #ef4444;">Error al cargar solicitudes KYC: ${error.message}</p>`;
+      return;
+    }
+
+    const listaBase = usuarios || [];
+    if (contadorEl) contadorEl.textContent = listaBase.length;
+
+    const listaConFotos = await Promise.all(listaBase.map(async (u) => {
+      let cedula_signed_url = '';
+      let selfie_signed_url = '';
+
+      if (u.cedula_foto_url) {
+        if (u.cedula_foto_url.startsWith('http')) {
+          cedula_signed_url = u.cedula_foto_url;
+        } else {
+          const { data: s1 } = await supabaseClient.storage
+            .from('kyc-documents')
+            .createSignedUrl(u.cedula_foto_url, 600);
+          cedula_signed_url = s1?.signedUrl || '';
+        }
+      }
+
+      if (u.selfie_foto_url) {
+        if (u.selfie_foto_url.startsWith('http')) {
+          selfie_signed_url = u.selfie_foto_url;
+        } else {
+          const { data: s2 } = await supabaseClient.storage
+            .from('kyc-documents')
+            .createSignedUrl(u.selfie_foto_url, 600);
+          selfie_signed_url = s2?.signedUrl || '';
+        }
+      }
+
+      return { ...u, cedula_signed_url, selfie_signed_url };
+    }));
+
+    renderizarTarjetasKycAdmin(listaConFotos);
+  } catch (err) {
+    contenedor.innerHTML = `<p style="color: #ef4444;">Error inesperado: ${err.message}</p>`;
+  }
+}
+    
+
+    function renderizarTarjetasKycAdmin(lista) {
+      const contenedor = document.getElementById('admin-kyc-container');
+      if (!contenedor) return;
+
+      if (!lista || lista.length === 0) {
+        contenedor.innerHTML = "<p style='color: #4ade80;'>✅ No hay cuentas pendientes de verificación.</p>";
+        return;
+      }
+
+      contenedor.innerHTML = lista.map(u => {
+        const nombreCuenta = u.username || u.full_name || u.name || 'Sin nombre';
+        const correoCuenta = u.email || 'Sin correo';
+        const cedula = u.cedula || '-';
+        const fechaNac = u.fecha_nacimiento || '-';
+        const genero = u.genero || '-';
+        const enviado = u.kyc_enviado_en ? new Date(u.kyc_enviado_en).toLocaleString() : 'Reciente';
+
+        const urlCedula = u.cedula_signed_url || u.cedula_foto_url || '';
+        const urlSelfie = u.selfie_signed_url || u.selfie_foto_url || '';
+
+        return `
+          <div class="kyc-card">
+            <div style="display: flex; justify-content: space-between; align-items: start; gap: 8px;">
+              <div>
+                <div style="font-weight: 800; color: #38bdf8; font-size: 1rem;">${nombreCuenta}</div>
+                <div style="font-size: 0.8rem; color: #cbd5e1;">${correoCuenta}</div>
+                <div style="font-size: 0.72rem; color: #64748b;">Enviado: ${enviado}</div>
+              </div>
+              <span class="badge badge-Pendiente">En revisión</span>
+            </div>
+
+            <div class="kyc-data-box">
+              <div><strong>Cédula:</strong> <span style="color:#fff;">${cedula}</span></div>
+              <div><strong>Fecha de nacimiento:</strong> <span style="color:#fff;">${fechaNac}</span></div>
+              <div><strong>Género:</strong> <span style="color:#fff;">${genero}</span></div>
+            </div>
+
+            <div class="kyc-photos-grid">
+              <div class="kyc-photo-box">
+                <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 700;">Foto Cédula</span>
+                ${urlCedula
+                  ? `<a href="${urlCedula}" target="_blank"><img src="${urlCedula}" alt="Cédula"></a>`
+                  : `<p style="font-size: 0.72rem; color: #64748b; margin-top: 12px;">Ruta: ${u.cedula_foto_url || 'No disponible'}</p>`}
+              </div>
+              <div class="kyc-photo-box">
+                <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 700;">Selfie</span>
+                ${urlSelfie
+                  ? `<a href="${urlSelfie}" target="_blank"><img src="${urlSelfie}" alt="Selfie"></a>`
+                  : `<p style="font-size: 0.72rem; color: #64748b; margin-top: 12px;">Ruta: ${u.selfie_foto_url || 'No disponible'}</p>`}
+              </div>
+            </div>
+
+            <input type="text" id="kyc-motivo-${u.id}" placeholder="Motivo si vas a rechazar (ej. No coincide o borrosa)" style="width: 100%; background: #030712; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.82rem;">
+
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn-approve" style="flex: 1; margin-right: 0;" onclick="resolverSolicitudKyc('${u.id}', 'verified')">
+                ✅ Verificar
+              </button>
+              <button type="button" class="btn-reject" style="flex: 1;" onclick="resolverSolicitudKyc('${u.id}', 'rejected')">
+                ❌ Rechazar
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function resolverSolicitudKyc(userId, decision) {
+      const motivoInput = document.getElementById(`kyc-motivo-${userId}`);
+      const motivo = motivoInput ? motivoInput.value.trim() : '';
+
+      if (decision === 'rejected' && !motivo) {
+        alert("⚠️ Escribe un motivo de rechazo para indicar al usuario qué corregir.");
+        return;
+      }
+
+      const textoConfirm = decision === 'verified'
+        ? "¿Confirmas que los datos y fotos coinciden y deseas marcar esta cuenta como VERIFICADA?"
+        : `¿Confirmas RECHAZAR esta verificación por el motivo: "${motivo}"?`;
+
+      if (!confirm(textoConfirm)) return;
+
+      try {
+        if (ADMIN_BACKEND_URL) {
+          const resp = await fetch(`${ADMIN_BACKEND_URL}/api/admin/kyc/resolve`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-admin-token': localStorage.getItem('admin_token') || ''
+            },
+            body: JSON.stringify({ userId, decision, motivo })
+          });
+          if (resp.ok) {
+            alert(decision === 'verified' ? "✅ Cuenta verificada con éxito." : "❌ Solicitud de verificación rechazada.");
+            await cargarSolicitudesKycAdmin();
+            return;
+          }
+        }
+
+        const { error } = await supabaseClient.rpc('admin_resolver_kyc', {
+  p_user_id: userId,
+  p_decision: decision,
+  p_motivo: decision === 'rejected' ? motivo : null
+});
+
+if (error) {
+  alert("❌ Error al actualizar la verificación: " + error.message);
+  return;
+}
+
+alert(decision === 'verified' ? "✅ Cuenta verificada con éxito." : "❌ Solicitud de verificación rechazada.");
+await cargarSolicitudesKycAdmin();
+
+        alert(decision === 'verified' ? "✅ Cuenta verificada con éxito." : "❌ Solicitud de verificación rechazada.");
+        await cargarSolicitudesKycAdmin();
+      } catch (err) {
+        alert("❌ Error al procesar la solicitud: " + err.message);
       }
     }
 
@@ -689,6 +939,7 @@
       }
 
       await cargarDepositosAdmin();
+      await cargarSolicitudesKycAdmin();
 
       const { data: withdrawals } = await supabaseClient
         .from('withdrawals')
