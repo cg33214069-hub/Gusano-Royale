@@ -40,7 +40,7 @@ process.on('unhandledRejection', (reason) => {
 // ==========================================
 // CONFIGURACIÓN DE SALAS Y MAPAS
 // ==========================================
-const MAX_PLAYERS_PER_ROOM = 20;
+const MAX_PLAYERS_PER_ROOM = 100;
 const MAX_LOOT_ORBS_PER_ROOM = 140;
 
 const MAP_PRESETS = {

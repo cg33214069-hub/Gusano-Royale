@@ -26,7 +26,7 @@ app.get('/', (req, res) => {
   res.send('Servidor Gusanos Royale activo');
 });
 
-const MAX_PLAYERS_PER_ROOM = 20;
+const MAX_PLAYERS_PER_ROOM = 100;
 
 const MAP_PRESETS = {
   pequeno: { width: 1400, height: 1000, foodCount: 90 },
