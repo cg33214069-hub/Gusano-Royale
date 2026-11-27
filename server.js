@@ -180,21 +180,6 @@ async function syncAdminConfig() {
 const configInterval = setInterval(syncAdminConfig, 8000);
 syncAdminConfig();
 
-// Muestrea hasta 55 puntos uniformes para mostrar el largo real sin saturar red
-function compactBody(body, maxSamples = 55) {
-  if (!Array.isArray(body) || body.length === 0) return [];
-  if (body.length <= maxSamples) {
-    return body.map((seg) => [Math.round(seg.x), Math.round(seg.y)]);
-  }
-  const sampled = [];
-  const step = (body.length - 1) / (maxSamples - 1);
-  for (let i = 0; i < maxSamples; i++) {
-    const idx = Math.min(body.length - 1, Math.round(i * step));
-    sampled.push([Math.round(body[idx].x), Math.round(body[idx].y)]);
-  }
-  return sampled;
-}
-
 // ==========================================
 // FUNCIÓN FINANCIERA ATÓMICA CON RPC DE SUPABASE
 // ==========================================
@@ -239,39 +224,6 @@ async function adjustBalance({ userId, amount, txType, matchId }) {
 }
 
 // ==========================================
-// SOLTAR BOTÍN AL MORIR UN JUGADOR
-// ==========================================
-function spawnDeathLoot(room, player) {
-  if (!room || !player || player.ves <= 0) return;
-
-  const validBody = Array.isArray(player.body) && player.body.length > 0
-    ? player.body
-    : [{ x: player.x, y: player.y }];
-
-  const drops = Math.min(40, Math.max(20, validBody.length));
-  const valuePerDrop = Math.max(1, Math.floor(player.ves / drops));
-
-  for (let i = 0; i < drops; i++) {
-    const progress = drops > 1 ? i / (drops - 1) : 0;
-    const idx = Math.min(validBody.length - 1, Math.floor(progress * (validBody.length - 1)));
-    const seg = validBody[idx];
-    const angle = Math.random() * Math.PI * 2;
-    const dist = Math.random() * 10;
-
-    room.loots.push({
-      id: `l_${Math.random().toString(36).slice(2, 9)}`,
-      x: Math.round(clampInside(seg.x + Math.cos(angle) * dist, 6, room.width)),
-      y: Math.round(clampInside(seg.y + Math.sin(angle) * dist, 6, room.height)),
-      value: valuePerDrop
-    });
-  }
-
-  if (room.loots.length > MAX_LOOT_ORBS_PER_ROOM) {
-    room.loots.splice(0, room.loots.length - MAX_LOOT_ORBS_PER_ROOM);
-  }
-}
-
-// ==========================================
 // EVENTOS DE SOCKET.IO
 // ==========================================
 io.on('connection', (socket) => {
@@ -300,287 +252,99 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('join_arena', async (data = {}) => {
-    try {
-      const roomId = data.roomId || 'sala_1';
-      const room = getRoom(roomId, data.entryFee || 50);
-      const isSpectator = Boolean(data.spectator);
+  // Unión a sala usada por el script cliente (arena_ves_50, arena_ves_100, etc.)
+  socket.on('join_room', (data = {}) => {
+    if (!data || !data.room) return;
 
-      const activeCount = Object.values(room.players).filter((p) => !p.spectator && p.alive).length;
-      if (!isSpectator && activeCount >= MAX_PLAYERS_PER_ROOM) {
-        socket.emit('join_error', { reason: `La sala está llena (máx. ${MAX_PLAYERS_PER_ROOM} jugadores)` });
-        return;
-      }
-
-      const entryFee = room.entryFee;
-      const matchId = String(data.matchId || `${room.id}_${Date.now()}_${socket.id}`);
-      const effectiveUserId = socket.data.userId || data.userId || null;
-
-      let confirmedBalance = null;
-      if (!isSpectator && entryFee > 0) {
-        if (!effectiveUserId) {
-          socket.emit('join_error', { reason: 'Debes iniciar sesión antes de entrar' });
-          return;
-        }
-
-        const charge = await adjustBalance({
-          userId: effectiveUserId,
-          amount: entryFee,
-          txType: 'entry',
-          matchId
-        });
-
-        if (!charge || !charge.ok) {
-          socket.emit('join_error', { reason: charge?.message || 'Saldo insuficiente' });
-          return;
-        }
-        confirmedBalance = charge.new_balance;
-      }
-
-      const radius = 12;
-      const startX = clampInside(room.width / 2 + (Math.random() - 0.5) * 160, radius, room.width);
-      const startY = clampInside(room.height / 2 + (Math.random() - 0.5) * 160, radius, room.height);
-
-      room.players[socket.id] = {
-        id: socket.id,
-        userId: effectiveUserId,
-        matchId,
-        entryFee,
-        name: (data.name || 'Jugador').toString().slice(0, 16),
-        x: startX,
-        y: startY,
-        angle: 0,
-        speed: 2.6,
-        boosting: false,
-        radius,
-        ves: entryFee,
-        skinId: data.skinId || 've',
-        color: data.color || '#22c55e',
-        alive: !isSpectator,
-        spectator: isSpectator,
-        claimedWin: false,
-        body: Array.from({ length: 20 }, () => ({ x: startX, y: startY }))
-      };
-
-      socket.join(room.id);
-      socket.data.roomId = room.id;
-
-      socket.emit('joined_arena', {
-        roomId: room.id,
-        matchId,
-        entryFee,
-        balance: confirmedBalance,
-        map: { size: adminConfig.mapSize, width: room.width, height: room.height },
-        food: { enabled: adminConfig.foodEnabled, value: adminConfig.foodValue }
-      });
-    } catch (err) {
-      console.error('Error join_arena:', err);
-      socket.emit('join_error', { reason: 'Error al ingresar a la sala' });
+    const prevRoom = socket.data.roomId;
+    if (prevRoom && prevRoom !== data.room) {
+      socket.leave(prevRoom);
     }
+
+    socket.join(data.room);
+    socket.data.roomId = data.room;
+    socket.data.customPlayerId = data.playerId || socket.id;
+    socket.data.playerName = data.name || 'Jugador';
+    socket.data.isSpectator = Boolean(data.isSpectator);
+
+    console.log(`🎮 ${socket.data.playerName} (${socket.data.customPlayerId}) entró a ${data.room}`);
   });
 
-  socket.on('player_input', (input = {}) => {
-    const roomId = socket.data.roomId;
-    const p = roomId && rooms[roomId] && rooms[roomId].players[socket.id];
-    if (!p || !p.alive || p.spectator) return;
+  // Reenvío de movimiento entre jugadores de la misma sala
+  socket.on('player_move', (payload = {}) => {
+    const targetRoom = payload.room || socket.data.roomId;
+    if (!targetRoom) return;
 
-    if (typeof input.angle === 'number' && Number.isFinite(input.angle)) {
-      p.angle = input.angle;
-    }
-    p.boosting = Boolean(input.boosting) && p.ves > p.entryFee * 0.1;
-    p.speed = p.boosting ? 4.4 : 2.6;
+    socket.data.lastPlayerId = payload.id || socket.data.customPlayerId || socket.id;
+    socket.to(targetRoom).emit('player_move', {
+      ...payload,
+      room: targetRoom
+    });
   });
 
-  socket.on('claim_win', async () => {
-    try {
-      const roomId = socket.data.roomId;
-      const room = roomId && rooms[roomId];
-      const p = room && room.players[socket.id];
+  // Notificar eliminación de jugador a los demás de la sala
+  socket.on('player_died', (payload = {}) => {
+    const targetRoom = payload.room || socket.data.roomId;
+    const deadId = payload.id || socket.data.customPlayerId || socket.id;
+    if (!targetRoom) return;
 
-      if (!p || !p.userId || !p.matchId || p.spectator || p.claimedWin || !p.alive) {
-        return;
-      }
+    socket.to(targetRoom).emit('player_died', {
+      ...payload,
+      id: deadId,
+      room: targetRoom
+    });
+  });
 
-      p.claimedWin = true;
-      p.alive = false;
+  // Reenviar lote de botín al morir
+  socket.on('spawn_loot_batch', (payload = {}) => {
+    const targetRoom = payload.room || socket.data.roomId;
+    if (!targetRoom) return;
 
-      const payout = Math.max(0, Math.floor(p.ves > p.entryFee ? p.ves : p.entryFee * 1.8));
+    socket.to(targetRoom).emit('spawn_loot_batch', {
+      ...payload,
+      room: targetRoom
+    });
+  });
 
-      const credit = await adjustBalance({
-        userId: p.userId,
-        amount: payout,
-        txType: 'win',
-        matchId: p.matchId
-      });
+  // Reenviar orbe individual de botín
+  socket.on('spawn_loot', (payload = {}) => {
+    const targetRoom = payload.room || socket.data.roomId;
+    if (!targetRoom) return;
 
-      if (!credit || !credit.ok) {
-        p.claimedWin = false;
-        socket.emit('win_error', { reason: credit?.message || 'No se pudo acreditar ganancia' });
-        return;
-      }
+    socket.to(targetRoom).emit('spawn_loot', {
+      ...payload,
+      room: targetRoom
+    });
+  });
 
-      socket.emit('win_credited', {
-        matchId: p.matchId,
-        payout,
-        balance: credit.new_balance
-      });
-    } catch (err) {
-      console.error('Error claim_win:', err);
-      socket.emit('win_error', { reason: 'Error interno al sumar ganancia' });
-    }
+  // Reenviar recolección de botín para quitarlo en los demás clientes
+  socket.on('collect_loot', (payload = {}) => {
+    const targetRoom = payload.room || socket.data.roomId;
+    if (!targetRoom) return;
+
+    socket.to(targetRoom).emit('collect_loot', {
+      ...payload,
+      room: targetRoom
+    });
   });
 
   socket.on('disconnect', () => {
     console.log(`❌ Desconectado: ${socket.id}`);
-    const roomId = socket.data.roomId;
-    if (roomId && rooms[roomId]) {
-      const leaving = rooms[roomId].players[socket.id];
-      if (leaving && leaving.alive && !leaving.spectator) {
-        spawnDeathLoot(rooms[roomId], leaving);
-      }
-      delete rooms[roomId].players[socket.id];
+    const targetRoom = socket.data.roomId;
+    const leavingId = socket.data.lastPlayerId || socket.data.customPlayerId;
+
+    if (targetRoom && leavingId) {
+      socket.to(targetRoom).emit('player_died', {
+        id: leavingId,
+        room: targetRoom
+      });
+    }
+
+    if (targetRoom && rooms[targetRoom]) {
+      delete rooms[targetRoom].players[socket.id];
     }
   });
 });
-
-// ==========================================
-// BUCLE PRINCIPAL DEL MUNDO (20 TPS)
-// ==========================================
-const tickInterval = setInterval(() => {
-  try {
-    const dims = getMapDims(adminConfig.mapSize);
-
-    Object.keys(rooms).forEach((roomId) => {
-      const room = rooms[roomId];
-      if (!room) return;
-
-      room.width = dims.width;
-      room.height = dims.height;
-
-      const activePlayers = Object.values(room.players).filter((p) => !p.spectator && p.alive);
-      if (activePlayers.length === 0) return;
-
-      // 1. Movimiento, consumo por turbo y largo real
-      activePlayers.forEach((p) => {
-        if (p.boosting && p.ves > p.entryFee * 0.1) {
-          p.ves = Math.max(0, Number((p.ves - p.entryFee * 0.0015).toFixed(2)));
-        } else {
-          p.boosting = false;
-          p.speed = 2.6;
-        }
-
-        p.radius = 10 + Math.min(20, Math.sqrt(p.ves) * 0.25);
-        p.x = clampInside(p.x + Math.cos(p.angle) * p.speed, p.radius, room.width);
-        p.y = clampInside(p.y + Math.sin(p.angle) * p.speed, p.radius, room.height);
-
-        const targetLen = Math.max(15, Math.min(120, Math.floor(15 + p.ves / Math.max(1, p.entryFee / 20))));
-        p.body.unshift({ x: p.x, y: p.y });
-        while (p.body.length > targetLen) {
-          p.body.pop();
-        }
-      });
-
-      // 2. Comida del mapa
-      if (adminConfig.foodEnabled) {
-        while (room.foods.length < dims.foodCount) {
-          room.foods.push(spawnFood(room.width, room.height, adminConfig.foodValue));
-        }
-
-        for (let i = room.foods.length - 1; i >= 0; i--) {
-          const f = room.foods[i];
-          let eaten = false;
-
-          for (const p of activePlayers) {
-            const dx = p.x - f.x;
-            const dy = p.y - f.y;
-            const hitDist = p.radius + 10;
-            if (dx * dx + dy * dy <= hitDist * hitDist) {
-              p.ves = Number((p.ves + (Number(f.value) || adminConfig.foodValue)).toFixed(2));
-              eaten = true;
-              break;
-            }
-          }
-
-          if (eaten) {
-            room.foods.splice(i, 1);
-            room.foods.push(spawnFood(room.width, room.height, adminConfig.foodValue));
-          }
-        }
-      } else if (room.foods.length > 0) {
-        room.foods = [];
-      }
-
-      // 3. Recolección de botín soltado al morir
-      for (let i = room.loots.length - 1; i >= 0; i--) {
-        const l = room.loots[i];
-        for (const p of activePlayers) {
-          const dx = p.x - l.x;
-          const dy = p.y - l.y;
-          const hitDist = p.radius + 12;
-          if (dx * dx + dy * dy <= hitDist * hitDist) {
-            p.ves = Number((p.ves + l.value).toFixed(2));
-            room.loots.splice(i, 1);
-            break;
-          }
-        }
-      }
-
-      // 4. Colisiones entre jugadores
-      for (const p of activePlayers) {
-        if (!p.alive) continue;
-        for (const other of activePlayers) {
-          if (p.id === other.id || !other.alive) continue;
-
-          for (let idx = 3; idx < other.body.length; idx += 2) {
-            const seg = other.body[idx];
-            const dx = p.x - seg.x;
-            const dy = p.y - seg.y;
-            const minDist = p.radius + 8;
-            if (dx * dx + dy * dy < minDist * minDist) {
-              p.alive = false;
-              spawnDeathLoot(room, p);
-              io.to(p.id).emit('player_eliminated', { by: other.name });
-              break;
-            }
-          }
-          if (!p.alive) break;
-        }
-      }
-
-      // 5. Envío de estado actualizado a toda la sala
-      const stillAlive = Object.values(room.players).filter((p) => !p.spectator && p.alive);
-      const playersPayload = {};
-      stillAlive.forEach((p) => {
-        playersPayload[p.id] = {
-          id: p.id,
-          name: p.name,
-          x: Math.round(p.x),
-          y: Math.round(p.y),
-          angle: Number(p.angle.toFixed(2)),
-          speed: p.speed,
-          ves: p.ves,
-          skinId: p.skinId,
-          color: p.color,
-          alive: p.alive,
-          body: compactBody(p.body, 55)
-        };
-      });
-
-      io.to(room.id).emit('world_state', {
-        roomId: room.id,
-        width: room.width,
-        height: room.height,
-        worldSize: room.width,
-        foodEnabled: adminConfig.foodEnabled,
-        foods: room.foods.map((f) => [f.x, f.y, f.value]),
-        loots: room.loots.map((l) => [l.x, l.y, l.value]),
-        players: playersPayload
-      });
-    });
-  } catch (err) {
-    console.error('⚠️ Error en tickInterval:', err.message);
-  }
-}, 50);
 
 // ==========================================
 // APAGADO LIMPIO EN RED HAT (SYSTEMD / PM2)
@@ -588,7 +352,6 @@ const tickInterval = setInterval(() => {
 function gracefulShutdown(signal) {
   console.log(`🛑 Recibida señal ${signal}. Cerrando servidor limpiamente...`);
   clearInterval(configInterval);
-  clearInterval(tickInterval);
   io.close(() => {
     server.close(() => {
       console.log('✅ Servidor cerrado correctamente.');
