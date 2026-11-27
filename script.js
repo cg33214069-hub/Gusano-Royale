@@ -226,7 +226,7 @@ if (boostBtn && !isSpectator) {
 // ==========================================
 // 2. CONEXIÓN DIRECTA AL SERVIDOR EN LA PC (SOCKET.IO)
 // ==========================================
-const PC_SERVER_URL = ' https://albums-identified-wool-virtual.trycloudflare.com';
+const PC_SERVER_URL = 'https://albums-identified-wool-virtual.trycloudflare.com';
 const roomChannelName = `arena_ves_${selectedEntryFee}`;
 const myPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
 let remotePlayers = {};
