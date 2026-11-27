@@ -224,9 +224,10 @@ if (boostBtn && !isSpectator) {
 }
 
 // ==========================================
-// 2. CONEXIÓN A SUPABASE Y SOCKETS DE RENDER
+// 2. CONEXIÓN DIRECTA AL SERVIDOR EN LA PC (SOCKET.IO)
 // ==========================================
-let gameRoom = null;
+const PC_SERVER_URL = 'https://experts-websites-only-carl.trycloudflare.com';
+const roomChannelName = `arena_ves_${selectedEntryFee}`;
 const myPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
 let remotePlayers = {};
 let sharedLootOrbs = [];
@@ -273,11 +274,17 @@ function buildSampledBody(bodySegments, maxSamples = 30) {
   return sampled;
 }
 
-const roomChannelName = `arena_ves_${selectedEntryFee}`;
+function emitirEventoSala(eventName, payload) {
+  if (!socket || !socket.connected) return;
+  socket.emit(eventName, {
+    room: roomChannelName,
+    ...payload
+  });
+}
 
 let socket = null;
 if (typeof io !== 'undefined') {
-  socket = io('https://gusano-royale-1.onrender.com', {
+  socket = io(PC_SERVER_URL, {
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionAttempts: 10,
@@ -286,7 +293,68 @@ if (typeof io !== 'undefined') {
   window.gameSocket = socket;
 
   socket.on('connect', () => {
-    console.log('¡Conectado al servidor de Render con éxito!');
+    console.log('✅ Conectado al servidor en tu PC:', PC_SERVER_URL);
+    socket.emit('join_room', {
+      room: roomChannelName,
+      playerId: myPlayerId,
+      name: playerName,
+      entryFee: selectedEntryFee,
+      isSpectator
+    });
+  });
+
+  socket.on('player_move', (payload) => {
+    if (payload && payload.id !== myPlayerId) {
+      if (!remotePlayers[payload.id]) {
+        remotePlayers[payload.id] = {
+          ...payload,
+          targetX: payload.x,
+          targetY: payload.y,
+          targetAngle: payload.angle,
+          renderAngle: payload.angle,
+          currentSpeed: payload.speed || 1.9,
+          targetBody: payload.body
+        };
+      } else {
+        const p = remotePlayers[payload.id];
+        p.targetX = payload.x;
+        p.targetY = payload.y;
+        p.targetAngle = payload.angle;
+        p.currentSpeed = payload.speed || 1.9;
+        p.ves = payload.ves;
+        p.skinId = payload.skinId;
+        p.color = payload.color;
+        p.targetBody = payload.body;
+      }
+      remotePlayers[payload.id].lastUpdate = Date.now();
+    }
+  });
+
+  socket.on('player_died', (payload) => {
+    if (payload && remotePlayers[payload.id]) {
+      delete remotePlayers[payload.id];
+    }
+  });
+
+  socket.on('spawn_loot_batch', (payload) => {
+    if (payload && Array.isArray(payload.orbs)) {
+      appendLootOrbsWithLimit(payload.orbs);
+    }
+  });
+
+  socket.on('spawn_loot', (payload) => {
+    if (payload) {
+      appendLootOrbsWithLimit([payload]);
+    }
+  });
+
+  socket.on('collect_loot', (payload) => {
+    if (payload && payload.lootId) {
+      const idx = sharedLootOrbs.findIndex(o => o.id === payload.lootId);
+      if (idx !== -1) sharedLootOrbs.splice(idx, 1);
+    } else if (payload && typeof payload.index === 'number' && sharedLootOrbs[payload.index]) {
+      sharedLootOrbs.splice(payload.index, 1);
+    }
   });
 }
 
@@ -325,72 +393,6 @@ async function verificarYCargarComida() {
   } else {
     arenaFoodOrbs = [];
   }
-}
-
-if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-  gameRoom = supabaseClient.channel(roomChannelName, {
-    config: { broadcast: { self: false } }
-  });
-
-  gameRoom.on('broadcast', { event: 'player_move' }, ({ payload }) => {
-    if (payload && payload.id !== myPlayerId) {
-      if (!remotePlayers[payload.id]) {
-        remotePlayers[payload.id] = {
-          ...payload,
-          targetX: payload.x,
-          targetY: payload.y,
-          targetAngle: payload.angle,
-          renderAngle: payload.angle,
-          currentSpeed: payload.speed || 1.9,
-          targetBody: payload.body
-        };
-      } else {
-        const p = remotePlayers[payload.id];
-        p.targetX = payload.x;
-        p.targetY = payload.y;
-        p.targetAngle = payload.angle;
-        p.currentSpeed = payload.speed || 1.9;
-        p.ves = payload.ves;
-        p.skinId = payload.skinId;
-        p.color = payload.color;
-        p.targetBody = payload.body;
-      }
-      remotePlayers[payload.id].lastUpdate = Date.now();
-    }
-  });
-
-  gameRoom.on('broadcast', { event: 'player_died' }, ({ payload }) => {
-    if (payload && remotePlayers[payload.id]) {
-      delete remotePlayers[payload.id];
-    }
-  });
-
-  gameRoom.on('broadcast', { event: 'spawn_loot_batch' }, ({ payload }) => {
-    if (payload && Array.isArray(payload.orbs)) {
-      appendLootOrbsWithLimit(payload.orbs);
-    }
-  });
-
-  gameRoom.on('broadcast', { event: 'spawn_loot' }, ({ payload }) => {
-    if (payload) {
-      appendLootOrbsWithLimit([payload]);
-    }
-  });
-
-  gameRoom.on('broadcast', { event: 'collect_loot' }, ({ payload }) => {
-    if (payload && payload.lootId) {
-      const idx = sharedLootOrbs.findIndex(o => o.id === payload.lootId);
-      if (idx !== -1) sharedLootOrbs.splice(idx, 1);
-    } else if (payload && typeof payload.index === 'number' && sharedLootOrbs[payload.index]) {
-      sharedLootOrbs.splice(payload.index, 1);
-    }
-  });
-
-  gameRoom.subscribe((status) => {
-    if (status === 'SUBSCRIBED') {
-      console.log(`¡Conectado a la sala aislada [${roomChannelName}]${isSpectator ? ' (MODO ESPECTADOR)' : ''}!`);
-    }
-  });
 }
 
 // ==========================================
@@ -460,13 +462,7 @@ function dropLootOnDeath(x, y, totalVes, bodySegments = []) {
 
   appendLootOrbsWithLimit(batchOrbs);
 
-  if (gameRoom) {
-    gameRoom.send({
-      type: 'broadcast',
-      event: 'spawn_loot_batch',
-      payload: { orbs: batchOrbs }
-    });
-  }
+  emitirEventoSala('spawn_loot_batch', { orbs: batchOrbs });
 }
 
 let lastSendTime = 0;
@@ -553,36 +549,28 @@ function updateLocalPlayer(dtFactor = 1) {
         const collectedId = orb.id;
         sharedLootOrbs.splice(i, 1);
 
-        if (gameRoom && collectedId) {
-          gameRoom.send({
-            type: 'broadcast',
-            event: 'collect_loot',
-            payload: { lootId: collectedId }
-          });
+        if (collectedId) {
+          emitirEventoSala('collect_loot', { lootId: collectedId });
         }
       }
     }
   }
 
-  if (gameRoom && gameActive) {
+  if (gameActive) {
     const now = Date.now();
     if (now - lastSendTime > 75) {
       lastSendTime = now;
-      gameRoom.send({
-        type: 'broadcast',
-        event: 'player_move',
-        payload: {
-          id: player.id,
-          name: player.name,
-          x: Number(player.x.toFixed(1)),
-          y: Number(player.y.toFixed(1)),
-          angle: Number(player.angle.toFixed(3)),
-          speed: currentSpeed,
-          ves: Math.floor(player.ves),
-          skinId: player.skinId,
-          color: player.color,
-          body: buildSampledBody(player.body, 30)
-        }
+      emitirEventoSala('player_move', {
+        id: player.id,
+        name: player.name,
+        x: Number(player.x.toFixed(1)),
+        y: Number(player.y.toFixed(1)),
+        angle: Number(player.angle.toFixed(3)),
+        speed: currentSpeed,
+        ves: Math.floor(player.ves),
+        skinId: player.skinId,
+        color: player.color,
+        body: buildSampledBody(player.body, 30)
       });
     }
   }
@@ -612,7 +600,6 @@ function drawPlayer(p, camera, isLocal, dtFactor = 1) {
       p.renderAngle += aDiff * Math.min(1, 0.22 * dtFactor);
     }
 
-    // Predicción continua por cuadro para evitar parones entre paquetes
     p.x += Math.cos(p.renderAngle) * spd * dtFactor;
     p.y += Math.sin(p.renderAngle) * spd * dtFactor;
 
@@ -621,7 +608,6 @@ function drawPlayer(p, camera, isLocal, dtFactor = 1) {
       const dy = p.targetY - p.y;
       const dist = Math.hypot(dx, dy);
 
-      // Corrección suave sin teletransportarse de golpe
       const correctionFactor = dist > 220
         ? Math.min(0.42, 0.25 * dtFactor)
         : Math.min(0.24, 0.14 * dtFactor);
@@ -789,9 +775,7 @@ function checkRealPlayerCollisions() {
           player.alive = false;
           dropLootOnDeath(player.x, player.y, player.ves, player.body);
 
-          if (gameRoom) {
-            gameRoom.send({ type: 'broadcast', event: 'player_died', payload: { id: player.id } });
-          }
+          emitirEventoSala('player_died', { id: player.id });
           endGame(false, `Chocaste contra el cuerpo de ${friend.name}. ¡Has quedado eliminado!`);
           return;
         }
@@ -813,13 +797,7 @@ function checkWallCollisions() {
   if (hitLeft || hitRight || hitTop || hitBottom) {
     if (currentPhase === 'EXTRACTION_FREE') {
       player.alive = false;
-      if (gameRoom) {
-        gameRoom.send({
-          type: 'broadcast',
-          event: 'player_died',
-          payload: { id: player.id }
-        });
-      }
+      emitirEventoSala('player_died', { id: player.id });
       endGame(true, '¡Saliste por la raya verde! Te llevas todo tu botín recolectado.');
       return;
     }
@@ -827,14 +805,7 @@ function checkWallCollisions() {
     player.alive = false;
     dropLootOnDeath(player.x, player.y, player.ves, player.body);
 
-    if (gameRoom) {
-      gameRoom.send({
-        type: 'broadcast',
-        event: 'player_died',
-        payload: { id: player.id }
-      });
-    }
-
+    emitirEventoSala('player_died', { id: player.id });
     endGame(false, '¡Chocaste contra la línea roja del límite del mapa! Has quedado eliminado.');
   }
 }
@@ -1093,12 +1064,6 @@ async function salirAlMenuConCarga(urlDestino = 'dashboard.html') {
   }
 
   actualizarProgresoCarga(65, 'Cerrando conexión con la sala...');
-  if (gameRoom && typeof supabaseClient !== 'undefined' && supabaseClient) {
-    try {
-      await supabaseClient.removeChannel(gameRoom);
-    } catch (e) {}
-  }
-
   if (socket) {
     try {
       socket.disconnect();
