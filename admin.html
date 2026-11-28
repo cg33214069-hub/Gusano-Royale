@@ -43,6 +43,68 @@
 
     h1 { font-size: 1.6rem; color: #38bdf8; }
 
+    /* CONTROL DE APERTURA / BLOQUEO DE SALAS */
+    .rooms-lock-card {
+      background: #0b0f19;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .rooms-lock-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .room-toggle-box {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .room-toggle-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .room-status-pill {
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 999px;
+    }
+
+    .room-status-open {
+      background: rgba(34, 197, 94, 0.16);
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, 0.4);
+    }
+
+    .room-status-closed {
+      background: rgba(239, 68, 68, 0.16);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .btn-room-toggle {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 8px;
+      border: none;
+      font-weight: 800;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+
     /* TARJETAS RESUMEN FINANCIERO */
     .metrics-grid {
       display: grid;
@@ -347,8 +409,68 @@
   <div class="admin-container">
     <header>
       <h1>🛡️ Panel de Administración - Gusanos Royale</h1>
-      <button onclick="loadData(); loadPromotoresData(); chequearEstadoComida(); cargarSolicitudesKycAdmin();" style="background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">🔄 Actualizar Datos</button>
+      <button onclick="loadData(); loadPromotoresData(); chequearEstadoComida(); cargarSolicitudesKycAdmin(); cargarEstadoSalasAdmin();" style="background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">🔄 Actualizar Datos</button>
     </header>
+
+    <!-- CONTROL MANUAL DE APERTURA / BLOQUEO DE LAS 4 SALAS -->
+    <div class="rooms-lock-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h3 style="color: #fbbf24; font-size: 1.1rem; margin-bottom: 4px;">🔒 Control de Acceso a las Salas</h3>
+          <p style="color: #94a3b8; font-size: 0.85rem;">Activa o bloquea cada sala cuando lo desees. Cuando está bloqueada, aparece con candado en el lobby y nadie puede entrar.</p>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" onclick="cambiarTodasLasSalas(true)" style="background: #22c55e; color: #000; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 800; font-size: 0.8rem; cursor: pointer;">
+            🔓 Activar Todas
+          </button>
+          <button type="button" onclick="cambiarTodasLasSalas(false)" style="background: #ef4444; color: #fff; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 800; font-size: 0.8rem; cursor: pointer;">
+            🔒 Bloquear Todas
+          </button>
+        </div>
+      </div>
+
+      <div class="rooms-lock-grid">
+        <div class="room-toggle-box">
+          <div class="room-toggle-header">
+            <strong style="color: #fff; font-size: 0.95rem;">Sala Principiantes</strong>
+            <span id="status-pill-sala-1" class="room-status-pill room-status-closed">🔒 Bloqueada</span>
+          </div>
+          <button type="button" id="btn-toggle-sala-1" class="btn-room-toggle" onclick="alternarSalaAdmin('sala-1')" style="background: #22c55e; color: #000;">
+            Activar Sala
+          </button>
+        </div>
+
+        <div class="room-toggle-box">
+          <div class="room-toggle-header">
+            <strong style="color: #fff; font-size: 0.95rem;">Sala Media</strong>
+            <span id="status-pill-sala-2" class="room-status-pill room-status-closed">🔒 Bloqueada</span>
+          </div>
+          <button type="button" id="btn-toggle-sala-2" class="btn-room-toggle" onclick="alternarSalaAdmin('sala-2')" style="background: #22c55e; color: #000;">
+            Activar Sala
+          </button>
+        </div>
+
+        <div class="room-toggle-box">
+          <div class="room-toggle-header">
+            <strong style="color: #fff; font-size: 0.95rem;">Sala Profesional</strong>
+            <span id="status-pill-sala-3" class="room-status-pill room-status-closed">🔒 Bloqueada</span>
+          </div>
+          <button type="button" id="btn-toggle-sala-3" class="btn-room-toggle" onclick="alternarSalaAdmin('sala-3')" style="background: #22c55e; color: #000;">
+            Activar Sala
+          </button>
+        </div>
+
+        <div class="room-toggle-box">
+          <div class="room-toggle-header">
+            <strong style="color: #fff; font-size: 0.95rem;">Sala VIP SBRk</strong>
+            <span id="status-pill-sala-4" class="room-status-pill room-status-closed">🔒 Bloqueada</span>
+          </div>
+          <button type="button" id="btn-toggle-sala-4" class="btn-room-toggle" onclick="alternarSalaAdmin('sala-4')" style="background: #22c55e; color: #000;">
+            Activar Sala
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- CONTROL DE COMIDA EN EL MAPA -->
     <div class="bots-control-card">
@@ -429,7 +551,7 @@
     <script>
       function verSalaAdmin(roomId) {
         sessionStorage.setItem('gusanos_admin_auth', 'true');
-        window.location.href = `game.html?room=${roomId}&spectator=true`;
+        window.location.href = `arena/game.html?room=${roomId}&spectator=true`;
       }
     </script>
 
@@ -620,8 +742,89 @@
     let globalUserMap = {}; 
     let activeWithdrawal = null; 
 
-    // Si tienes un backend en Render/Node con /api/admin/kyc/pending y /api/admin/kyc/resolve, pon aquí la URL base.
     const ADMIN_BACKEND_URL = '';
+
+    // ==========================================
+    // CONTROL MANUAL DE SALAS (room_settings)
+    // ==========================================
+    const estadoSalasAdmin = {
+      'sala-1': false,
+      'sala-2': false,
+      'sala-3': false,
+      'sala-4': false
+    };
+
+    function pintarControlesSalasAdmin() {
+      ['sala-1', 'sala-2', 'sala-3', 'sala-4'].forEach((salaId) => {
+        const abierta = Boolean(estadoSalasAdmin[salaId]);
+        const pill = document.getElementById(`status-pill-${salaId}`);
+        const btn = document.getElementById(`btn-toggle-${salaId}`);
+
+        if (pill) {
+          pill.className = `room-status-pill ${abierta ? 'room-status-open' : 'room-status-closed'}`;
+          pill.textContent = abierta ? '🟢 Abierta' : '🔒 Bloqueada';
+        }
+
+        if (btn) {
+          btn.textContent = abierta ? 'Bloquear Sala' : 'Activar Sala';
+          btn.style.background = abierta ? '#ef4444' : '#22c55e';
+          btn.style.color = abierta ? '#fff' : '#000';
+        }
+      });
+    }
+
+    async function cargarEstadoSalasAdmin() {
+      const { data, error } = await supabaseClient
+        .from('room_settings')
+        .select('room_id, is_open');
+
+      if (!error && Array.isArray(data)) {
+        data.forEach((row) => {
+          if (row && row.room_id in estadoSalasAdmin) {
+            estadoSalasAdmin[row.room_id] = Boolean(row.is_open);
+          }
+        });
+      }
+
+      pintarControlesSalasAdmin();
+    }
+
+    async function alternarSalaAdmin(salaId) {
+      const nuevoEstado = !Boolean(estadoSalasAdmin[salaId]);
+
+      const { error } = await supabaseClient
+        .from('room_settings')
+        .upsert({ room_id: salaId, is_open: nuevoEstado }, { onConflict: 'room_id' });
+
+      if (error) {
+        alert("❌ Error al cambiar el estado de la sala: " + error.message);
+        return;
+      }
+
+      estadoSalasAdmin[salaId] = nuevoEstado;
+      pintarControlesSalasAdmin();
+    }
+
+    async function cambiarTodasLasSalas(abrir) {
+      const filas = ['sala-1', 'sala-2', 'sala-3', 'sala-4'].map((room_id) => ({
+        room_id,
+        is_open: Boolean(abrir)
+      }));
+
+      const { error } = await supabaseClient
+        .from('room_settings')
+        .upsert(filas, { onConflict: 'room_id' });
+
+      if (error) {
+        alert("❌ Error al actualizar todas las salas: " + error.message);
+        return;
+      }
+
+      ['sala-1', 'sala-2', 'sala-3', 'sala-4'].forEach((id) => {
+        estadoSalasAdmin[id] = Boolean(abrir);
+      });
+      pintarControlesSalasAdmin();
+    }
 
     // ==========================================
     // CONTROL DE COMIDA Y VES EN EL MAPA
@@ -695,6 +898,7 @@
     }
 
     chequearEstadoComida();
+    cargarEstadoSalasAdmin();
 
     function switchTab(type, btnElement) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -722,62 +926,61 @@
     // VERIFICACIÓN DE CUENTAS (KYC ADMIN)
     // ==========================================
     async function cargarSolicitudesKycAdmin() {
-  const contenedor = document.getElementById('admin-kyc-container');
-  const contadorEl = document.getElementById('kyc-pending-count');
-  if (!contenedor) return;
+      const contenedor = document.getElementById('admin-kyc-container');
+      const contadorEl = document.getElementById('kyc-pending-count');
+      if (!contenedor) return;
 
-  contenedor.innerHTML = "<p style='color: #64748b;'>Cargando solicitudes de verificación...</p>";
+      contenedor.innerHTML = "<p style='color: #64748b;'>Cargando solicitudes de verificación...</p>";
 
-  try {
-    const { data: usuarios, error } = await supabaseClient
-      .from('profiles')
-      .select('*')
-      .eq('kyc_status', 'pending')
-      .order('kyc_enviado_en', { ascending: true });
+      try {
+        const { data: usuarios, error } = await supabaseClient
+          .from('profiles')
+          .select('*')
+          .eq('kyc_status', 'pending')
+          .order('kyc_enviado_en', { ascending: true });
 
-    if (error) {
-      contenedor.innerHTML = `<p style="color: #ef4444;">Error al cargar solicitudes KYC: ${error.message}</p>`;
-      return;
+        if (error) {
+          contenedor.innerHTML = `<p style="color: #ef4444;">Error al cargar solicitudes KYC: ${error.message}</p>`;
+          return;
+        }
+
+        const listaBase = usuarios || [];
+        if (contadorEl) contadorEl.textContent = listaBase.length;
+
+        const listaConFotos = await Promise.all(listaBase.map(async (u) => {
+          let cedula_signed_url = '';
+          let selfie_signed_url = '';
+
+          if (u.cedula_foto_url) {
+            if (u.cedula_foto_url.startsWith('http')) {
+              cedula_signed_url = u.cedula_foto_url;
+            } else {
+              const { data: s1 } = await supabaseClient.storage
+                .from('kyc-documents')
+                .createSignedUrl(u.cedula_foto_url, 600);
+              cedula_signed_url = s1?.signedUrl || '';
+            }
+          }
+
+          if (u.selfie_foto_url) {
+            if (u.selfie_foto_url.startsWith('http')) {
+              selfie_signed_url = u.selfie_foto_url;
+            } else {
+              const { data: s2 } = await supabaseClient.storage
+                .from('kyc-documents')
+                .createSignedUrl(u.selfie_foto_url, 600);
+              selfie_signed_url = s2?.signedUrl || '';
+            }
+          }
+
+          return { ...u, cedula_signed_url, selfie_signed_url };
+        }));
+
+        renderizarTarjetasKycAdmin(listaConFotos);
+      } catch (err) {
+        contenedor.innerHTML = `<p style="color: #ef4444;">Error inesperado: ${err.message}</p>`;
+      }
     }
-
-    const listaBase = usuarios || [];
-    if (contadorEl) contadorEl.textContent = listaBase.length;
-
-    const listaConFotos = await Promise.all(listaBase.map(async (u) => {
-      let cedula_signed_url = '';
-      let selfie_signed_url = '';
-
-      if (u.cedula_foto_url) {
-        if (u.cedula_foto_url.startsWith('http')) {
-          cedula_signed_url = u.cedula_foto_url;
-        } else {
-          const { data: s1 } = await supabaseClient.storage
-            .from('kyc-documents')
-            .createSignedUrl(u.cedula_foto_url, 600);
-          cedula_signed_url = s1?.signedUrl || '';
-        }
-      }
-
-      if (u.selfie_foto_url) {
-        if (u.selfie_foto_url.startsWith('http')) {
-          selfie_signed_url = u.selfie_foto_url;
-        } else {
-          const { data: s2 } = await supabaseClient.storage
-            .from('kyc-documents')
-            .createSignedUrl(u.selfie_foto_url, 600);
-          selfie_signed_url = s2?.signedUrl || '';
-        }
-      }
-
-      return { ...u, cedula_signed_url, selfie_signed_url };
-    }));
-
-    renderizarTarjetasKycAdmin(listaConFotos);
-  } catch (err) {
-    contenedor.innerHTML = `<p style="color: #ef4444;">Error inesperado: ${err.message}</p>`;
-  }
-}
-    
 
     function renderizarTarjetasKycAdmin(lista) {
       const contenedor = document.getElementById('admin-kyc-container');
@@ -879,18 +1082,15 @@
         }
 
         const { error } = await supabaseClient.rpc('admin_resolver_kyc', {
-  p_user_id: userId,
-  p_decision: decision,
-  p_motivo: decision === 'rejected' ? motivo : null
-});
+          p_user_id: userId,
+          p_decision: decision,
+          p_motivo: decision === 'rejected' ? motivo : null
+        });
 
-if (error) {
-  alert("❌ Error al actualizar la verificación: " + error.message);
-  return;
-}
-
-alert(decision === 'verified' ? "✅ Cuenta verificada con éxito." : "❌ Solicitud de verificación rechazada.");
-await cargarSolicitudesKycAdmin();
+        if (error) {
+          alert("❌ Error al actualizar la verificación: " + error.message);
+          return;
+        }
 
         alert(decision === 'verified' ? "✅ Cuenta verificada con éxito." : "❌ Solicitud de verificación rechazada.");
         await cargarSolicitudesKycAdmin();

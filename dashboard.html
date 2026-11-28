@@ -474,6 +474,7 @@
     }
 
     .room-card {
+      position: relative;
       background: #0b0f19;
       border-radius: 12px;
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -481,6 +482,29 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+      transition: opacity 0.25s ease, filter 0.25s ease, transform 0.2s ease;
+    }
+
+    .room-card.room-locked {
+      opacity: 0.52;
+      filter: brightness(0.72) saturate(0.75);
+    }
+
+    .room-lock-badge {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: #fbbf24;
+      background: rgba(245, 158, 11, 0.14);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .room-card.room-locked .room-lock-badge {
+      display: inline-flex;
     }
 
     .room-card.beginner { border-top: 3px solid #38bdf8; }
@@ -492,6 +516,8 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
       margin-bottom: 8px;
     }
 
@@ -543,6 +569,12 @@
     .medium .btn-play-room { background: #9333ea; }
     .pro .btn-play-room { background: #ca8a04; }
     .vip .btn-play-room { background: #dc2626; }
+
+    .btn-play-room.room-btn-locked {
+      background: #334155 !important;
+      color: #cbd5e1 !important;
+      cursor: not-allowed !important;
+    }
 
     /* PANEL DE REFERIDOS Y TOKENS EN PERFIL */
     .referral-box {
@@ -783,52 +815,56 @@
 
       <h2 class="section-title">🔹 SALAS DISPONIBLES EN VIVO</h2>
       <div class="rooms-grid">
-        <div class="room-card beginner">
+        <div class="room-card beginner room-locked">
           <div class="room-badge-header">
             <span class="room-badge">NOBATUM</span>
+            <span class="room-lock-badge" id="lock-sala-1">🔒 CERRADA</span>
             <div class="online-badge"><span class="dot-verde"></span><strong id="count-sala-1">0</strong> en línea</div>
           </div>
           <h3>Sala Principiantes</h3>
           <p style="font-size: 0.75rem; color: #64748b; margin: 8px 0 16px;">Ideal para entrenamiento rápido.</p>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:6px;"><span style="color:#64748b;">Entrada:</span><strong style="color:#fff;">50 VES</strong></div>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span style="color:#64748b;">Pozo Est.:</span><strong style="color:#fff;">500 VES</strong></div>
-          <button class="btn-play-room" onclick="unirseASala('sala-1', 50)">ENTRAR A JUGAR</button>
+          <button class="btn-play-room room-btn-locked" disabled onclick="unirseASala('sala-1', 50)">🔒 SALA BLOQUEADA</button>
         </div>
 
-        <div class="room-card medium">
+        <div class="room-card medium room-locked">
           <div class="room-badge-header">
             <span class="room-badge">INTERMEDIA</span>
+            <span class="room-lock-badge" id="lock-sala-2">🔒 CERRADA</span>
             <div class="online-badge"><span class="dot-verde"></span><strong id="count-sala-2">0</strong> en línea</div>
           </div>
           <h3>Sala Media</h3>
           <p style="font-size: 0.75rem; color: #64748b; margin: 8px 0 16px;">Competencia moderada.</p>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:6px;"><span style="color:#64748b;">Entrada:</span><strong style="color:#fff;">100 VES</strong></div>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span style="color:#64748b;">Pozo Est.:</span><strong style="color:#fff;">1.000 VES</strong></div>
-          <button class="btn-play-room" onclick="unirseASala('sala-2', 100)">ENTRAR A JUGAR</button>
+          <button class="btn-play-room room-btn-locked" disabled onclick="unirseASala('sala-2', 100)">🔒 SALA BLOQUEADA</button>
         </div>
 
-        <div class="room-card pro">
+        <div class="room-card pro room-locked">
           <div class="room-badge-header">
             <span class="room-badge">ÉLITE</span>
+            <span class="room-lock-badge" id="lock-sala-3">🔒 CERRADA</span>
             <div class="online-badge"><span class="dot-verde"></span><strong id="count-sala-3">0</strong> en línea</div>
           </div>
           <h3>Sala Profesional</h3>
           <p style="font-size: 0.75rem; color: #64748b; margin: 8px 0 16px;">Para jugadores experimentados.</p>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:6px;"><span style="color:#64748b;">Entrada:</span><strong style="color:#fff;">500 VES</strong></div>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span style="color:#64748b;">Pozo Est.:</span><strong style="color:#fff;">5.000 VES</strong></div>
-          <button class="btn-play-room" onclick="unirseASala('sala-3', 500)">ENTRAR A JUGAR</button>
+          <button class="btn-play-room room-btn-locked" disabled onclick="unirseASala('sala-3', 500)">🔒 SALA BLOQUEADA</button>
         </div>
 
-        <div class="room-card vip">
+        <div class="room-card vip room-locked">
           <div class="room-badge-header">
             <span class="room-badge">HIGH ROLLER</span>
+            <span class="room-lock-badge" id="lock-sala-4">🔒 CERRADA</span>
             <div class="online-badge"><span class="dot-verde"></span><strong id="count-sala-4">0</strong> en línea</div>
           </div>
           <h3>Sala VIP SBRk</h3>
           <p style="font-size: 0.75rem; color: #64748b; margin: 8px 0 16px;">Grandes apuestas y premios.</p>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:6px;"><span style="color:#64748b;">Entrada:</span><strong style="color:#fff;">1.000 VES</strong></div>
           <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span style="color:#64748b;">Pozo Est.:</span><strong style="color:#fff;">10.000 VES</strong></div>
-          <button class="btn-play-room" onclick="unirseASala('sala-4', 1000)">ENTRAR A JUGAR</button>
+          <button class="btn-play-room room-btn-locked" disabled onclick="unirseASala('sala-4', 1000)">🔒 SALA BLOQUEADA</button>
         </div>
       </div>
     </section>
@@ -1100,6 +1136,65 @@
     
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let selectedPaymentMethod = 'pago_movil';
+
+    // --- ESTADO DE APERTURA / BLOQUEO DE SALAS (CONTROLADO DESDE ADMIN) ---
+    const estadoSalasAbiertas = {
+      'sala-1': false,
+      'sala-2': false,
+      'sala-3': false,
+      'sala-4': false
+    };
+
+    function aplicarEstadoVisualSalas() {
+      const botones = document.querySelectorAll('.rooms-grid .btn-play-room');
+
+      ['sala-1', 'sala-2', 'sala-3', 'sala-4'].forEach((salaId, index) => {
+        const abierta = Boolean(estadoSalasAbiertas[salaId]);
+        const btn = botones[index];
+        const card = btn ? btn.closest('.room-card') : null;
+
+        if (card) {
+          card.classList.toggle('room-locked', !abierta);
+        }
+
+        if (btn) {
+          btn.disabled = !abierta;
+          btn.classList.toggle('room-btn-locked', !abierta);
+          btn.innerHTML = abierta ? 'ENTRAR A JUGAR' : '🔒 SALA BLOQUEADA';
+        }
+      });
+    }
+
+    async function cargarEstadoSalas() {
+      const { data, error } = await supabaseClient
+        .from('room_settings')
+        .select('room_id, is_open');
+
+      if (!error && Array.isArray(data)) {
+        data.forEach((row) => {
+          if (row && row.room_id in estadoSalasAbiertas) {
+            estadoSalasAbiertas[row.room_id] = Boolean(row.is_open);
+          }
+        });
+      }
+
+      aplicarEstadoVisualSalas();
+    }
+
+    supabaseClient
+      .channel('cambios-estado-salas')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'room_settings' },
+        (payload) => {
+          const registro = payload.new || payload.old;
+          if (registro && registro.room_id in estadoSalasAbiertas) {
+            estadoSalasAbiertas[registro.room_id] = Boolean(payload.new?.is_open);
+            aplicarEstadoVisualSalas();
+          }
+        }
+      )
+      .subscribe();
 
     // --- ESTADO KYC DEL USUARIO ---
     let estadoKycActual = 'unverified';
@@ -1630,8 +1725,14 @@
       canalesSalas[salaId] = canal;
     });
 
-    // --- FUNCIÓN UNIRSE A SALA (BLOQUEA SI NO ESTÁ VERIFICADO) ---
+    // --- FUNCIÓN UNIRSE A SALA (BLOQUEA SI ESTÁ CERRADA O NO VERIFICADO) ---
     async function unirseASala(salaId, costoEntrada) {
+      await cargarEstadoSalas();
+      if (!estadoSalasAbiertas[salaId]) {
+        alert("🔒 Esta sala está bloqueada en este momento. Espera a que el administrador la active.");
+        return;
+      }
+
       const { userId, userEmail } = obtenerIdentificadorUsuario();
 
       if (!userId && !userEmail) {
@@ -1671,7 +1772,7 @@
 
       localStorage.setItem('selected_room', salaId);
       localStorage.setItem('selected_entry', costoEntrada);
-      window.location.href = 'game.html';
+      window.location.href = 'arena/game.html';
     }
 
     async function switchTab(tabId, event) {
@@ -2081,6 +2182,8 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      aplicarEstadoVisualSalas();
+      cargarEstadoSalas();
       loadUserData();
       cargarDatosReferidosPerfil();
       selectPaymentMethod('pago_movil');
