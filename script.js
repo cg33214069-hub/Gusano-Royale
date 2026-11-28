@@ -497,7 +497,7 @@ function updateLocalPlayer(dtFactor = 1) {
   let diff = targetAngle - player.angle;
   while (diff < -Math.PI) diff += Math.PI * 2;
   while (diff > Math.PI) diff -= Math.PI * 2;
-  const turnSmooth = Math.min(1, 0.16 * dtFactor);
+  const turnSmooth = Math.min(1, 0.18 * dtFactor);
   player.angle += diff * turnSmooth;
 
   player.x += Math.cos(player.angle) * currentSpeed * dtFactor;
@@ -508,9 +508,6 @@ function updateLocalPlayer(dtFactor = 1) {
     const margin = player.radius + 10;
     player.x = Math.max(margin, Math.min(mapSizeSafe - margin, player.x));
     player.y = Math.max(margin, Math.min(mapSizeSafe - margin, player.y));
-  } else if (!player.alive) {
-    player.x = Math.max(0, Math.min(mapSizeSafe, player.x));
-    player.y = Math.max(0, Math.min(mapSizeSafe, player.y));
   }
 
   player.body.unshift({ x: player.x, y: player.y });
@@ -558,7 +555,7 @@ function updateLocalPlayer(dtFactor = 1) {
 
   if (gameActive) {
     const now = Date.now();
-    if (now - lastSendTime > 75) {
+    if (now - lastSendTime > 65) {
       lastSendTime = now;
       emitirEventoSala('player_move', {
         id: player.id,
@@ -566,22 +563,22 @@ function updateLocalPlayer(dtFactor = 1) {
         x: Number(player.x.toFixed(1)),
         y: Number(player.y.toFixed(1)),
         angle: Number(player.angle.toFixed(3)),
-        speed: currentSpeed,
+        speed: Number(currentSpeed.toFixed(2)),
+        length: player.length,
         ves: Math.floor(player.ves),
         skinId: player.skinId,
-        color: player.color,
-        body: buildSampledBody(player.body, 30)
+        color: player.color
       });
     }
   }
 }
 
-// ==========================================
-// 4. RENDERIZADO Y LÍNEA CONTINUA (FLUIDO / TIPO SEDA)
-// ==========================================
 function drawPlayer(p, camera, isLocal, dtFactor = 1) {
+  const wormRadius = Math.max(4, 6.5 * Math.min(1.25, 1 + Math.sqrt(p.ves || 0) * 0.025));
+
   if (!isLocal) {
     const spd = p.currentSpeed || 1.9;
+    const desiredLen = Math.max(10, Math.min(60, Math.round(p.length || (p.targetBody && p.targetBody.length) || 14)));
 
     if (p.x === undefined || p.y === undefined) {
       p.x = p.targetX ?? 0;
@@ -597,51 +594,62 @@ function drawPlayer(p, camera, isLocal, dtFactor = 1) {
       let aDiff = p.targetAngle - p.renderAngle;
       while (aDiff < -Math.PI) aDiff += Math.PI * 2;
       while (aDiff > Math.PI) aDiff -= Math.PI * 2;
-      p.renderAngle += aDiff * Math.min(1, 0.22 * dtFactor);
+      p.renderAngle += aDiff * Math.min(1, 0.24 * dtFactor);
     }
 
+    // Avance predicho en la dirección actual
     p.x += Math.cos(p.renderAngle) * spd * dtFactor;
     p.y += Math.sin(p.renderAngle) * spd * dtFactor;
 
+    // Corrección suave hacia la última posición recibida del servidor
     if (p.targetX !== undefined && p.targetY !== undefined) {
       const dx = p.targetX - p.x;
       const dy = p.targetY - p.y;
       const dist = Math.hypot(dx, dy);
 
-      const correctionFactor = dist > 220
-        ? Math.min(0.42, 0.25 * dtFactor)
-        : Math.min(0.24, 0.14 * dtFactor);
+      let correctionFactor = 0.12 * dtFactor;
+      if (dist > 250) {
+        correctionFactor = 0.45 * dtFactor;
+      } else if (dist > 70) {
+        correctionFactor = 0.22 * dtFactor;
+      }
 
-      p.x += dx * correctionFactor;
-      p.y += dy * correctionFactor;
+      p.x += dx * Math.min(1, correctionFactor);
+      p.y += dy * Math.min(1, correctionFactor);
     }
 
-    if (p.targetBody && Array.isArray(p.targetBody) && p.targetBody.length > 0) {
-      if (!p.body || p.body.length === 0) {
-        p.body = p.targetBody.map(seg => ({ x: p.x, y: p.y }));
-      } else {
-        while (p.body.length < p.targetBody.length) {
-          const tail = p.body[p.body.length - 1] || { x: p.x, y: p.y };
-          p.body.push({ x: tail.x, y: tail.y });
-        }
-        while (p.body.length > p.targetBody.length && p.body.length > 2) {
-          p.body.pop();
-        }
+    // Reconstrucción fluida del cuerpo siguiendo la cabeza con separación constante
+    if (!p.body || p.body.length === 0) {
+      p.body = [];
+      for (let i = 0; i < desiredLen; i++) {
+        p.body.push({ x: p.x, y: p.y });
+      }
+    } else {
+      p.body[0].x = p.x;
+      p.body[0].y = p.y;
 
-        p.body[0].x = p.x;
-        p.body[0].y = p.y;
+      while (p.body.length < desiredLen) {
+        const tail = p.body[p.body.length - 1];
+        p.body.push({ x: tail.x, y: tail.y });
+      }
+      while (p.body.length > desiredLen && p.body.length > 2) {
+        p.body.pop();
+      }
 
-        const bodyLerp = Math.min(0.32, 0.18 * dtFactor);
-        for (let i = 1; i < p.body.length; i++) {
-          const prev = p.body[i - 1];
-          const curr = p.body[i];
-          const targetSeg = p.targetBody[i] || prev;
+      const segmentSpacing = Math.max(2.2, wormRadius * 0.42);
+      for (let i = 1; i < p.body.length; i++) {
+        const prev = p.body[i - 1];
+        const curr = p.body[i];
+        const dx = prev.x - curr.x;
+        const dy = prev.y - curr.y;
+        const dist = Math.hypot(dx, dy);
 
-          const desiredX = targetSeg.x * 0.65 + prev.x * 0.35;
-          const desiredY = targetSeg.y * 0.65 + prev.y * 0.35;
-
-          curr.x += (desiredX - curr.x) * bodyLerp;
-          curr.y += (desiredY - curr.y) * bodyLerp;
+        if (dist > 0.001) {
+          const targetX = prev.x - (dx / dist) * segmentSpacing;
+          const targetY = prev.y - (dy / dist) * segmentSpacing;
+          const followLerp = Math.min(1, 0.55 * dtFactor);
+          curr.x += (targetX - curr.x) * followLerp;
+          curr.y += (targetY - curr.y) * followLerp;
         }
       }
     }
@@ -652,7 +660,6 @@ function drawPlayer(p, camera, isLocal, dtFactor = 1) {
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  const wormRadius = Math.max(4, 6.5 * Math.min(1.25, 1 + Math.sqrt(p.ves || 0) * 0.025));
   ctx.lineWidth = wormRadius * 2;
 
   if (p.skinId === 've') {
