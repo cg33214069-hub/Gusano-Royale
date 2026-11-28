@@ -426,6 +426,23 @@
       border-color: #38bdf8;
     }
 
+    .camera-hint {
+      color: #94a3b8;
+      font-size: 0.75rem;
+      display: block;
+      margin-top: 5px;
+    }
+
+    .camera-preview-img {
+      display: none;
+      width: 100%;
+      max-height: 160px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-top: 8px;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+    }
+
     .btn-confirm-deposit {
       background: #22c55e;
       color: white;
@@ -996,12 +1013,12 @@
     </div>
   </div>
 
-  <!-- MODAL 2: FORMULARIO DE VERIFICACIÓN KYC -->
+  <!-- MODAL 2: FORMULARIO DE VERIFICACIÓN KYC (CAPTURA DIRECTA EN CÁMARA) -->
   <div id="kyc-form-modal" class="kyc-modal-backdrop">
     <div class="kyc-modal-card">
       <h3 class="kyc-modal-title">🪪 Verificación de Identidad</h3>
       <p class="kyc-modal-desc">
-        Ingresa tus datos reales tal como aparecen en tu documento y en tu registro.
+        Ingresa tus datos reales tal como aparecen en tu documento y toma ambas fotos al instante con la cámara de tu teléfono.
       </p>
 
       <form id="kyc-submit-form">
@@ -1026,13 +1043,17 @@
         </div>
 
         <div class="input-group">
-          <label for="kyc-input-foto-cedula">Foto de Cédula</label>
-          <input type="file" id="kyc-input-foto-cedula" accept="image/*" required>
+          <label for="kyc-input-foto-cedula">Foto de Cédula (Cámara trasera)</label>
+          <input type="file" id="kyc-input-foto-cedula" accept="image/*" capture="environment" required>
+          <small class="camera-hint">Debe tomarse directo con la cámara al momento; no se permiten imágenes de galería.</small>
+          <img id="preview-foto-cedula" class="camera-preview-img" alt="Vista previa de cédula">
         </div>
 
         <div class="input-group">
-          <label for="kyc-input-selfie">Selfie</label>
+          <label for="kyc-input-selfie">Selfie (Cámara frontal)</label>
           <input type="file" id="kyc-input-selfie" accept="image/*" capture="user" required>
+          <small class="camera-hint">Debe tomarse directo con la cámara frontal al momento; no se permiten imágenes de galería.</small>
+          <img id="preview-foto-selfie" class="camera-preview-img" alt="Vista previa de selfie">
         </div>
 
         <div id="kyc-form-feedback" class="kyc-feedback"></div>
@@ -1099,6 +1120,78 @@
       return { userId, userEmail };
     }
 
+    function esArchivoSospechosoDeGaleria(file) {
+      if (!file) return true;
+      const nombre = (file.name || '').toLowerCase();
+      const patronesGaleria = [
+        /^img_\d+/,
+        /^screenshot/,
+        /^whatsapp/,
+        /^fb_img/,
+        /^received_/,
+        /^download/,
+        /editado/,
+        /collage/
+      ];
+      return patronesGaleria.some(rx => rx.test(nombre));
+    }
+
+    function validarCapturaCamaraKyc(archivoCedula, archivoSelfie) {
+      if (!archivoCedula || !archivoSelfie) {
+        return 'Debes tomar tanto la foto de la cédula como la selfie con la cámara.';
+      }
+      if (!archivoCedula.type?.startsWith('image/') || !archivoSelfie.type?.startsWith('image/')) {
+        return 'Solo se permiten fotos capturadas con la cámara.';
+      }
+      if (
+        archivoCedula.name === archivoSelfie.name &&
+        archivoCedula.size === archivoSelfie.size &&
+        archivoCedula.lastModified === archivoSelfie.lastModified
+      ) {
+        return 'La foto de la cédula y la selfie no pueden ser la misma imagen.';
+      }
+      if (esArchivoSospechosoDeGaleria(archivoCedula) || esArchivoSospechosoDeGaleria(archivoSelfie)) {
+        return 'Toma ambas fotos directamente con la cámara en este momento; no selecciones imágenes guardadas o de galería.';
+      }
+      return null;
+    }
+
+    function inicializarVistaPreviaCamara(inputId, previewId) {
+      const input = document.getElementById(inputId);
+      const preview = document.getElementById(previewId);
+      if (!input || !preview) return;
+
+      input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        if (!file) {
+          preview.style.display = 'none';
+          preview.removeAttribute('src');
+          return;
+        }
+        if (!file.type || !file.type.startsWith('image/')) {
+          input.value = '';
+          preview.style.display = 'none';
+          alert('⚠️ Solo se permiten imágenes capturadas con la cámara.');
+          return;
+        }
+        if (esArchivoSospechosoDeGaleria(file)) {
+          input.value = '';
+          preview.style.display = 'none';
+          alert('⚠️ Toma la foto directamente con la cámara en este momento, sin usar archivos guardados o de galería.');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          preview.src = ev.target.result;
+          preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    inicializarVistaPreviaCamara('kyc-input-foto-cedula', 'preview-foto-cedula');
+    inicializarVistaPreviaCamara('kyc-input-selfie', 'preview-foto-selfie');
+
     function renderizarEstadoKyc(status, motivo = '') {
       estadoKycActual = (status || 'unverified').toLowerCase().trim();
       motivoRechazoKyc = motivo || '';
@@ -1145,7 +1238,7 @@
         if (navText) navText.textContent = 'No verificado';
         if (profBadge) profBadge.classList.add('kyc-unverified');
         if (profText) profText.textContent = 'No verificado';
-        if (profSub) profSub.textContent = 'Debes verificar tu cuenta para depositar, retirar y jugar en salas reales.';
+        if (profSub) profSub.textContent = 'Debes verificar tu cuenta para depositar, retirar y entrar a salas reales.';
         if (btnPerfilVerificar) {
           btnPerfilVerificar.style.display = 'inline-block';
           btnPerfilVerificar.textContent = '🪪 Verificar cuenta';
@@ -1250,7 +1343,14 @@
 
       if (!cedula || !fechaNacimiento || !genero || !archivoCedula || !archivoSelfie) {
         feedbackEl.style.color = '#f87171';
-        feedbackEl.textContent = 'Completa todos los campos y adjunta ambas fotos.';
+        feedbackEl.textContent = 'Completa todos los campos y toma ambas fotos con la cámara.';
+        return;
+      }
+
+      const errorCamara = validarCapturaCamaraKyc(archivoCedula, archivoSelfie);
+      if (errorCamara) {
+        feedbackEl.style.color = '#f87171';
+        feedbackEl.textContent = errorCamara;
         return;
       }
 
@@ -1304,14 +1404,14 @@
         if (errSelf) throw errSelf;
 
         const { error: rpcError } = await supabaseClient.rpc('enviar_solicitud_kyc', {
-         p_cedula: cedula,
-         p_fecha_nacimiento: fechaNacimiento,
-         p_genero: genero,
-         p_cedula_foto_url: pathCedula,
-         p_selfie_foto_url: pathSelfie,
-         p_user_id: perfilId
-      });
-      
+          p_cedula: cedula,
+          p_fecha_nacimiento: fechaNacimiento,
+          p_genero: genero,
+          p_cedula_foto_url: pathCedula,
+          p_selfie_foto_url: pathSelfie,
+          p_user_id: perfilId
+        });
+
         if (rpcError) {
           if (String(rpcError.message || '').includes('profiles_cedula_unique_idx')) {
             throw new Error('Esta cédula ya está registrada en otra cuenta.');
@@ -1327,6 +1427,10 @@
           cerrarModalKyc('kyc-form-modal');
           btnEnviar.disabled = false;
           document.getElementById('kyc-submit-form').reset();
+          const prevCed = document.getElementById('preview-foto-cedula');
+          const prevSelf = document.getElementById('preview-foto-selfie');
+          if (prevCed) { prevCed.style.display = 'none'; prevCed.removeAttribute('src'); }
+          if (prevSelf) { prevSelf.style.display = 'none'; prevSelf.removeAttribute('src'); }
         }, 1200);
 
       } catch (err) {
