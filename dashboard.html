@@ -1737,7 +1737,7 @@
 
       if (!userId && !userEmail) {
         alert("⚠️ Debes iniciar sesión para entrar a una sala de apuestas.");
-        window.location.href = 'index.html';
+        window.location.href = 'game.html';
         return;
       }
 
@@ -1772,7 +1772,7 @@
 
       localStorage.setItem('selected_room', salaId);
       localStorage.setItem('selected_entry', costoEntrada);
-      window.location.href = 'arena/game.html';
+      window.location.href = 'game.html';
     }
 
     async function switchTab(tabId, event) {

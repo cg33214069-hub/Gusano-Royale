@@ -19,7 +19,7 @@
         alert("¡Acceso concedido, GOMEZ! Bienvenido al panel.");
       } else {
         alert("Contraseña incorrecta. Acceso denegado.");
-        window.location.href = "index.html"; 
+        window.location.href = `game.html?room=${roomId}&spectator=true`;
       }
     }
   </script>
@@ -551,7 +551,7 @@
     <script>
       function verSalaAdmin(roomId) {
         sessionStorage.setItem('gusanos_admin_auth', 'true');
-        window.location.href = `arena/game.html?room=${roomId}&spectator=true`;
+        window.location.href = `game.html?room=${roomId}&spectator=true`;
       }
     </script>
 
